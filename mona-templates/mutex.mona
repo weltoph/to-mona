@@ -1,0 +1,20 @@
+{% import 'macros.mona' as macros %}
+
+{% call macros.pred_def("nomutex", formula.bound_to.states, []) -%}
+{%- set critical_components = formula.bound_to.components|selectattr("critical_states")|list -%}
+{%- if critical_components -%}
+{% call(component) macros.blockify("|", critical_components) -%}
+ex1 i, j: (0 <= i & i < n & 0 <= j & j < n & i ~= j) & (
+  {% call(critical_state) macros.blockify("|", component.critical_states, indentation_depth=2) -%}
+  i in {{ critical_state }}
+  {%- endcall %}
+) & (
+  {% call(critical_state) macros.blockify("|", component.critical_states, indentation_depth=2) -%}
+  j in {{ critical_state }}
+  {%- endcall %}
+)
+{%- endcall %}
+{%- else -%}
+false
+{%- endif -%}
+{%- endcall %}

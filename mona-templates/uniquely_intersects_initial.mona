@@ -1,0 +1,28 @@
+{% import 'macros.mona' as macros %}
+
+{% call macros.pred_def("uniquely_intersects_initial", formula.bound_to.states) -%}
+ex1 h: (0 <= h & h < n) & (
+  (
+    {% call(component) macros.blockify("|", formula.bound_to.components, indentation_depth=4) -%}
+    h in {{ component.initial_state }}
+    {%- if formula.bound_to.components|length > 1 -%}
+    {{ '\n' }}& (
+      {% call(other_component) macros.blockify("&", formula.bound_to.components|reject("sameas", component), indentation_depth=6) -%}
+      h notin {{ other_component.initial_state }}
+      {%- endcall %}
+    )
+    {%- endif -%}
+    {%- endcall %}
+  ) & (
+    all1 hh: (0 <= hh & hh < n) => (
+      (
+        {% call(c) macros.blockify("|", formula.bound_to.components, indentation_depth=8) -%}
+        hh in {{ c.initial_state }}
+        {%- endcall %}
+      ) => (
+        h = hh
+      )
+    )
+  )
+)
+{%- endcall %}

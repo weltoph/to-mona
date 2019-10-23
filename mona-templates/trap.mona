@@ -1,0 +1,16 @@
+{% import 'macros.mona' as macros %}
+
+{% call macros.pred_def("trap", formula.bound_to.states, []) -%}
+intersects_initial({{ macros.join(formula.bound_to.states) }}) & (
+{% call(clause) macros.blockify("&", formula.clauses, indentation_depth=4) -%}
+all1 {{ macros.join(clause.existential_terms|map("render_term_filter")|list) }}: (
+  (
+    {{ macros.clause_term_conditions(clause)|indent(4) }}
+    & ~{{ macros.pred_call("disjoint_origin_transition_" ~ clause.index, formula.bound_to.states, clause.existential_terms) }}
+  ) => (
+    ~{{ macros.pred_call("disjoint_target_transition_" ~ clause.index, formula.bound_to.states, clause.existential_terms) }}
+  )
+)
+{%- endcall %}
+)
+{%- endcall %}

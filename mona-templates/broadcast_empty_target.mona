@@ -1,0 +1,10 @@
+# empty target of b{{ broadcast.index }} of t{{ transition_index }}:
+all1 {% for t in broadcast.local_terms %}{{ t.mona_representation }}{% if not loop.last %}, {% endif %}{% endfor %}: (
+  (
+   {% for t in broadcast.local_terms if not t.trivial_term %} {{ t.mona_condition }} & {% endfor %}
+    {{- broadcast.guard.mona_representation }}
+    & (0 <= {{ broadcast.variable }} & {{ broadcast.variable }} < n)
+  ) => (
+    {{ broadcast.port.argument.mona_representation }} notin S{{ broadcast.port.target }}
+  )
+)

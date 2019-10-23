@@ -1,0 +1,9 @@
+{% import 'macros.mona' as macros %}
+
+{% call macros.pred_def_extended("intersection", ("var2 One", formula.bound_to.states), ("var2 Two", formula.bound_to.states)) -%}
+  ex1 h: (0 <= h & h < n) & (
+    {% call(s) macros.blockify("|", formula.bound_to.states) -%}
+    h in One{{ s }} & h in Two{{ s }}
+    {%- endcall %}
+  )
+{%- endcall %}

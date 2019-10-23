@@ -1,0 +1,11 @@
+{% import 'macros.mona' as macros %}
+
+{{ theory }}
+
+{% for s in formula.bound_to.states %}
+var2 {{ s }};
+{% endfor %}
+
+{{ size }} = n;
+
+{{ macros.pred_call(model_type, formula.bound_to.states) }};

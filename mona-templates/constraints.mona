@@ -1,0 +1,15 @@
+{% import 'macros.mona' as macros %}
+
+{% macro constraint(precondition, relation) -%}
+{% call macros.pred_def(precondition ~ "_constraint", formula.bound_to.states) -%}
+{%- set prefixed_states = macros.varlist(("T", formula.bound_to.states)) -%}
+all2 {{ prefixed_states }}: (
+  {{ precondition }}({{ prefixed_states }})
+  => {{ relation }}({{ macros.join(formula.bound_to.states) }}, {{ prefixed_states }})
+)
+{%- endcall %}
+{%- endmacro %}
+
+{{ constraint("trap", "intersection") }}
+
+{{ constraint("invariant", "unique_intersection") }}

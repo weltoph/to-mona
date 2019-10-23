@@ -1,0 +1,3 @@
+pred {{ name }}({{ varlist }}) = (
+  {{ formula|indent(2) }}
+);

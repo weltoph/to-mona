@@ -1,0 +1,11 @@
+{% import 'macros.mona' as macros %}
+
+var1 n;
+
+pred is_next(var1 first_index, var1 succ_first_index) = (
+    (first_index < n-1 => (succ_first_index = first_index+1))
+  & (first_index = n-1 => (succ_first_index = 0))
+);
+
+{{ theory_content }}
+

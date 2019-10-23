@@ -1,0 +1,16 @@
+{% import 'macros.mona' as macros %}
+# {{ clause }}
+{% macro disjoint_predicate(clause, region) -%}
+{% call macros.pred_def("disjoint_" ~ region ~ "_transition_" ~ clause.index, clause.bound_to.states, clause.existential_terms) -%}
+{{ macros.disjoint_in_existentials(clause, region) }}
+{%- if clause.broadcasts -%}
+{{- '\n' }}& (
+{{ macros.empty_in_broadcasts(clause, region) }}
+)
+{%- endif -%}
+{%- endcall %}
+{%- endmacro %}
+
+{{ disjoint_predicate(clause, "origin") }}
+
+{{ disjoint_predicate(clause, "target") }}
