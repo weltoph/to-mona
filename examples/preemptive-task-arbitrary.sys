@@ -1,0 +1,28 @@
+Component TaskZero
+initial executing;
+waiting -> getReadyZ -> ready;
+ready -> startExecutionZ -> executing;
+executing -> getPreemptedZ -> preempted;
+preempted -> resumeExecutionZ -> executing;
+executing -> stopExecutionZ -> waiting;
+critical executing;
+
+Component Task
+initial waiting;
+waiting -> getReady -> ready;
+ready -> startExecution -> executing;
+executing -> getPreempted -> preempted;
+preempted -> resumeExecution -> executing;
+executing -> stopExecution -> waiting;
+critical executing;
+
+Formula
+ex i: i = 0 . getReadyZ(i);
+ex i: 0 < i . getReady(i);
+ex i, j: i ~= j & i > 0 & j > 0. startExecution(i) & getPreempted(j);
+ex i, j: i ~= j & i = 0. startExecutionZ(i) & getPreempted(j);
+ex i, j: i ~= j & j = 0. startExecution(i) & getPreemptedZ(j);
+
+ex i, j: i ~= j & i > 0 & j > 0. stopExecution(i) & resumeExecution(j);
+ex i, j: i ~= j & i = 0. stopExecutionZ(i) & resumeExecution(j);
+ex i, j: i ~= j & j = 0. stopExecution(i) & resumeExecutionZ(j);

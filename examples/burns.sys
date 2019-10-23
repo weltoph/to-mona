@@ -1,0 +1,28 @@
+Component agent
+initial pc1;
+pc1 -> oneToTwo -> pc2;
+pc2 -> twoToThree -> pc3;
+pc2 -> twoToOne -> pc1;
+pc3 -> threeToFour -> pc4;
+pc4 -> fourToOne -> pc1;
+pc4 -> fourToFive -> pc5;
+pc5 -> fiveToSix -> pc6;
+pc6 -> sixToOne -> pc1;
+critical pc6;
+
+Component region
+initial bottom;
+bottom -> raise -> top;
+bottom -> isBottom -> bottom;
+top -> drop -> bottom;
+top -> isTop -> top;
+
+Formula
+ex p: true. oneToTwo(p);
+ex p, w: w < p. isTop(w) & twoToOne(p);
+ex p: true. twoToThree(p) with all s: s < p. isBottom(s);
+ex p: true. threeToFour(p) & raise(p);
+ex p, w: w < p. isTop(w) & fourToOne(p) & drop(p);
+ex p: true. fourToFive(p) with all s: s < p. isBottom(s);
+ex p: true. fiveToSix(p) with all b: p < b. isBottom(b);
+ex p: true. sixToOne(p) & drop(p);

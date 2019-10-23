@@ -1,0 +1,15 @@
+Component philosopher
+initial waiting;
+waiting -> grabFirst -> hungry;
+hungry -> grabSecond -> eating;
+eating -> dropBoth  -> waiting;
+
+Component fork
+initial free;
+free -> grabbed -> busy;
+busy -> released -> free;
+
+Formula
+ex p: true. grabFirst(p) & grabbed(p);
+ex p: true. grabSecond(p) & grabbed(succ(p));
+ex p: true. dropBoth(p) & released(p) & released(succ(p));

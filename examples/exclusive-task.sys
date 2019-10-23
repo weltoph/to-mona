@@ -1,0 +1,10 @@
+Component Task
+initial idle;
+idle -> startExecution -> executing;
+executing -> stopExecution -> idle;
+idle -> isIdle -> idle;
+critical executing;
+
+Formula
+ex p: true. startExecution(p) with all o: o ~= p. isIdle(o);
+ex p: true. stopExecution(p);

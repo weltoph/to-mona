@@ -2,6 +2,8 @@ from parser import parse
 from mona import Analysis, list_all_models
 
 import argparse
+import sys
+import lark
 
 provable_properties = {
         "mutex": ("mutual exclusion", "nomutex"),
@@ -62,7 +64,14 @@ def perform_analyses():
     files = args.file
     first = True
     for f in files:
-        formula = parse(f)
+        try:
+            formula = parse(f)
+        except IsADirectoryError:
+            print(f"skipping directory {f}", file = sys.stderr)
+            continue
+        except lark.exceptions.ParseError:
+            print(f"cannot parse {f}; skipping it", file = sys.stderr)
+            continue
         analysis = Analysis(f, formula)
         if args.only_check:
             analysis.perform_test(*provable_properties[args.only_check])

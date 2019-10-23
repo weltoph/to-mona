@@ -1,0 +1,14 @@
+Component Task
+initial waiting;
+waiting -> start -> critical;
+critical -> stop -> waiting;
+critical critical;
+
+Component Semaphore
+initial free;
+free -> aquire -> busy;
+busy -> release -> free;
+
+Formula
+ex p: true. start(p) & aquire(0);
+ex p: true. stop(p) & release(0);

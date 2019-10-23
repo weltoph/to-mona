@@ -27,7 +27,8 @@ grammar = """
     ports: port | [port "&"]+ port
     port: NAME "(" (term | constant) ")"
 
-    comparison_formula: [comparison_atom "&"] comparison_atom | "true"
+    comparison_formula: comparison_list | "true"
+    comparison_list: comparison_atom | [comparison_atom "&"]+ comparison_atom
     ?comparison_atom: term comparison term | constant comparison term | term comparison constant
 
     ?comparison: smaller | equal | unequal | bigger | smaller_equal | bigger_equal
@@ -116,9 +117,12 @@ class Transformation(Transformer):
         if not args:
             return Guard([])
         else:
-            return Guard(args)
+            return Guard(args.pop(0))
 
     def var_list(self, args):
+        return args
+
+    def comparison_list(self, args):
         return args
 
     def port(self, args):

@@ -1,0 +1,9 @@
+Component agent
+initial init;
+init -> go -> crit;
+crit -> og -> init;
+critical crit;
+
+Formula
+ex p: true. go(p);
+ex p: true. og(p);
