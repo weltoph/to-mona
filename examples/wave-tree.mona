@@ -1,0 +1,294 @@
+ws2s;
+
+var2 U;
+
+# U prefix closed + binary
+
+pred u_closed_binary_nonempty(var2 U) =
+  (all1 x : (x in U &  x ~= root) => x^ in U) &
+  (all1 x : (x.0 in U <=> x.1 in U)) &
+  (root in U);
+
+u_closed_binary_nonempty(U);
+
+# trap constraints
+
+pred trap(var2 A, var2 B, var2 C, var2 D) =
+  (all1 i : (i.0 in U & i.1 in U) =>
+      /* t2: */
+     ( ( (i in B | i.0 in A | i.1 in A) => (i in C | i.0 in B | i.1 in B) ) &
+      /* t3: */
+       ( (i in C | i.0 in D | i.1 in D) => (i in D | i.0 in A | i.1 in A) ) ) )
+   &
+  (all1 i : (i in U & i.0 notin U & i.1 notin U) => 
+      /* t4: */
+     ( ( (i in B) => (i in C) &
+      /* t5: */
+       ( (i in C) => (i in D) ) ) ) )
+   &
+   /* t0: */
+   (root in A => root in B) &
+   /* t1: */
+   (root in D => root in A);
+
+pred uniquely_intersects_pre_t2(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+    ((i in B) & i.0 notin A & i.1 notin A)
+  | (i notin B & i.0 in A & i.1 notin A)
+  | (i notin B & i.0 notin A & i.1 in A)
+);
+
+pred disjoint_to_pre_t2(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i notin B & i.0 notin A & i.1 notin A
+);
+
+pred uniquely_intersects_post_t2(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+    (i in C & i.0 notin B & i.1 notin B)
+  | (i notin C & i.0 in B & i.1 notin B)
+  | (i notin C & i.0 notin B & i.1 in B)
+);
+
+pred disjoint_to_post_t2(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i notin C & i.0 notin B & i.1 notin B
+);
+
+pred uniquely_intersects_pre_t3(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+    (i in C & i.0 notin D & i.1 notin D)
+  | (i notin C & i.0 in D & i.1 notin D)
+  | (i notin C & i.0 notin D & i.1 in D)
+);
+
+pred disjoint_to_pre_t3(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  (i notin C & i.0 notin D & i.1 notin D)
+);
+
+pred uniquely_intersects_post_t3(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+    (i in D & i.0 notin A & i.1 notin A)
+  | (i notin D & i.0 in A & i.1 notin A)
+  | (i notin D & i.0 notin A & i.1 in A)
+);
+
+pred disjoint_to_post_t3(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  (i notin D & i.0 notin A & i.1 notin A)
+);
+
+pred uniquely_intersects_pre_t4(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i in B
+);
+
+pred disjoint_to_pre_t4(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i notin B
+);
+
+pred uniquely_intersects_post_t4(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i in C
+);
+
+pred disjoint_to_post_t4(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i notin C
+);
+
+pred uniquely_intersects_pre_t5(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i in C
+);
+
+pred disjoint_to_pre_t5(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i notin C
+);
+
+pred uniquely_intersects_post_t5(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i in D
+);
+
+pred disjoint_to_post_t5(var2 A, var2 B, var2 C, var2 D, var1 i) = (
+  i notin D
+);
+
+pred uniquely_intersects_pre_t0(var2 A, var2 B, var2 C, var2 D) = (
+  root in A
+);
+
+pred disjoint_to_pre_t0(var2 A, var2 B, var2 C, var2 D) = (
+  root notin A
+);
+
+pred uniquely_intersects_post_t0(var2 A, var2 B, var2 C, var2 D) = (
+  root in B
+);
+
+pred disjoint_to_post_t0(var2 A, var2 B, var2 C, var2 D) = (
+  root notin B
+);
+
+pred uniquely_intersects_pre_t1(var2 A, var2 B, var2 C, var2 D) = (
+  root in D
+);
+
+pred disjoint_to_pre_t1(var2 A, var2 B, var2 C, var2 D) = (
+  root notin D
+);
+
+pred uniquely_intersects_post_t1(var2 A, var2 B, var2 C, var2 D) = (
+  root in A
+);
+
+pred disjoint_to_post_t1(var2 A, var2 B, var2 C, var2 D) = (
+  root notin A
+);
+
+pred oneflow(var2 A, var2 B, var2 C, var2 D) = (
+  ( /* t0: */
+    (
+        uniquely_intersects_pre_t0(A, B, C, D)
+      & uniquely_intersects_post_t0(A, B, C, D)
+    ) | (
+        disjoint_to_pre_t0(A, B, C, D)
+      & disjoint_to_post_t0(A, B, C, D)
+    )
+  ) & ( /* t1: */
+    (
+        uniquely_intersects_pre_t1(A, B, C, D)
+      & uniquely_intersects_post_t1(A, B, C, D)
+    ) | (
+        disjoint_to_pre_t1(A, B, C, D)
+      & disjoint_to_post_t1(A, B, C, D)
+    )
+  ) & ( /* t2: */
+    all1 i : (i.0 in U & i.1 in U) => (
+      (
+          uniquely_intersects_pre_t2(A, B, C, D, i)
+        & uniquely_intersects_post_t2(A, B, C, D, i)
+      ) | (
+          disjoint_to_pre_t2(A, B, C, D, i)
+        & disjoint_to_post_t2(A, B, C, D, i)
+      )
+    )
+  ) & ( /* t3: */
+    all1 i : (i.0 in U & i.1 in U) => (
+      (
+          uniquely_intersects_pre_t3(A, B, C, D, i)
+        & uniquely_intersects_post_t3(A, B, C, D, i)
+      ) | (
+          disjoint_to_pre_t3(A, B, C, D, i)
+        & disjoint_to_post_t3(A, B, C, D, i)
+      )
+    )
+  ) & ( /* t4: */
+    all1 i : (i in U & i.0 notin U & i.1 notin U) => (
+      (
+          uniquely_intersects_pre_t4(A, B, C, D, i)
+        & uniquely_intersects_post_t4(A, B, C, D, i)
+      ) | (
+          disjoint_to_pre_t4(A, B, C, D, i)
+        & disjoint_to_post_t4(A, B, C, D, i)
+      )
+    )
+  ) & ( /* t5: */
+    all1 i : (i in U & i.0 notin U & i.1 notin U) => (
+      (
+          uniquely_intersects_pre_t5(A, B, C, D, i)
+        & uniquely_intersects_post_t5(A, B, C, D, i)
+      ) | (
+          disjoint_to_pre_t5(A, B, C, D, i)
+        & disjoint_to_post_t5(A, B, C, D, i)
+      )
+    )
+  )
+);
+
+
+# initial constraint
+
+pred intersects_init(var2 A, var2 B, var2 C, var2 D) = (
+  ex1 i : (i in U & i in A)
+);
+
+pred uniquely_intersects_init(var2 A, var2 B, var2 C, var2 D) = (
+  ex1 i : (i in U & i in A) & all1 ii : ((ii in U & ii in A) => i = ii)
+);
+
+pred invariant(var2 A, var2 B, var2 C, var2 D) = (
+  oneflow(A, B, C, D) &
+  uniquely_intersects_init(A, B, C, D)
+);
+
+pred uniquely_intersects(var2 OneA, var2 OneB, var2 OneC, var2 OneD,
+                         var2 TwoA, var2 TwoB, var2 TwoC, var2 TwoD) = (
+  ex1 x: (x in U) & (
+    (
+         (x in OneA & x in TwoA)
+      & ~(x in OneB & x in TwoB)
+      & ~(x in OneC & x in TwoC)
+      & ~(x in OneD & x in TwoD)
+    ) | (
+        ~(x in OneA & x in TwoA)
+      &  (x in OneB & x in TwoB)
+      & ~(x in OneC & x in TwoC)
+      & ~(x in OneD & x in TwoD)
+    ) | (
+        ~(x in OneA & x in TwoA)
+      & ~(x in OneB & x in TwoB)
+      &  (x in OneC & x in TwoC)
+      & ~(x in OneD & x in TwoD)
+    ) | (
+        ~(x in OneA & x in TwoA)
+      & ~(x in OneB & x in TwoB)
+      & ~(x in OneC & x in TwoC)
+      &  (x in OneD & x in TwoD)
+    )
+  ) & (
+    all1 y: (y in U) & (
+        (y in OneA & y in TwoA)
+      | (y in OneB & y in TwoB)
+      | (y in OneC & y in TwoC)
+      | (y in OneD & y in TwoD)
+    ) => x = y
+  )
+);
+
+pred intersects(var2 OneA, var2 OneB, var2 OneC, var2 OneD,
+                var2 TwoA, var2 TwoB, var2 TwoC, var2 TwoD) = (
+  ex1 x: (
+    (x in OneA & x in TwoA)
+    | (x in OneB & x in TwoB)
+    | (x in OneC & x in TwoC)
+    | (x in OneD & x in TwoD)
+  )
+);
+
+
+pred marking(var2 A, var2 B, var2 C, var2 D) = (
+  all1 i: (i in U) => (
+    (i in A & i notin B & i notin C & i notin D)
+    | (i notin A & i in B & i notin C & i notin D)
+    | (i notin A & i notin B & i in C & i notin D)
+    | (i notin A & i notin B & i notin C & i in D)
+  )
+);
+
+# deadlock states
+
+pred deadlock(var2 A, var2 B, var2 C, var2 D) =
+  (all1 i : (i.0 in U & i.1 in U) =>
+     ( ( (i notin B | i.0 notin A | i.1 notin A) ) &
+       ( (i notin C | i.0 notin D | i.1 notin D)  ) ) )
+   &
+  (all1 i : (i in U & i.0 notin U & i.1 notin U) => 
+     ( ( (i notin B)  &
+       ( (i notin C) ) ) ) )
+   &
+   (root notin A) &
+   (root notin D);
+
+
+var2 A, B, C, D;
+# main
+
+marking(A, B, C, D);
+
+all2 TA, TB, TC, TD: trap(TA, TB, TC, TD) & intersects_init(TA, TB, TC, TD)
+  => intersects(TA, TB, TC, TD, A, B, C, D);
+
+all2 TA, TB, TC, TD: invariant(TA, TB, TC, TD)
+  => uniquely_intersects(TA, TB, TC, TD, A, B, C, D);
+
+deadlock(A, B, C, D);
