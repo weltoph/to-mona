@@ -69,7 +69,11 @@ def perform_analyses():
         except IsADirectoryError:
             print(f"skipping directory {f}", file = sys.stderr)
             continue
-        except lark.exceptions.ParseError:
+        except lark.exceptions.UnexpectedInput as e:
+            print(f"cannot parse {f}, error in line {e.line}; skipping it",
+                    file = sys.stderr)
+            continue
+        except lark.exceptions.LarkError:
             print(f"cannot parse {f}; skipping it", file = sys.stderr)
             continue
         analysis = Analysis(f, formula)
