@@ -1,0 +1,5 @@
+{% import 'macros.mona' as macros %}
+
+{% call macros.pred_def(name, formula.bound_to.states, []) -%}
+  {{ content }}
+{%- endcall %}

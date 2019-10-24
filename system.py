@@ -9,18 +9,11 @@ class Component:
     name: str
     initial_state: str
     transitions: List[Tuple[str, str, str]]
-    critical_states: List[str]
 
     def __str__(self) -> str:
         return f"Component {self.name} {self.transitions}"
 
     def __post_init__(self):
-        # prefix states with component name making them unique:
-        self.transitions = [(f"{self.name}_{s}", l, f"{self.name}_{t}")
-                for s, l, t in self.transitions]
-        self.initial_state = f"{self.name}_{self.initial_state}"
-        self.critical_states = [f"{self.name}_{s}" for s in self.critical_states]
-
         collection_by_label = {}
         states = set()
         found_initial = False
@@ -88,10 +81,6 @@ class System:
     @property
     def states(self) -> Set[str]:
         return sum([c.states for c in self.components], [])
-
-    @property
-    def has_critical_sections(self) -> bool:
-        return any([bool(c.critical_states) for c in self.components])
 
     def edge_with_label(self, label: str) -> Optional[Tuple[str, str]]:
         try:

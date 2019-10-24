@@ -2,8 +2,9 @@ Component agent
 initial init;
 init -> go -> crit;
 crit -> og -> init;
-critical crit;
 
 Formula
 ex p: true. go(p);
 ex p: true. og(p);
+
+mutes: "ex1 i, j : 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in crit & j in crit"

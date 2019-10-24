@@ -6,11 +6,6 @@ import argparse
 import sys
 import lark
 
-provable_properties = {
-        "mutex": ("mutual exclusion", "nomutex"),
-        "progress": ("progress", "deadlock")
-}
-
 listable_elements = {
         "traps": "trap",
         "invariants": "invariant"
@@ -40,10 +35,9 @@ parser.add_argument("-v", "--verbose",
         action="store_true",
         default=False)
 
-parser.add_argument("-o", "--only-check",
-        help="specifically checks only this property",
-        action="store",
-        choices=sorted(list(provable_properties.keys())),
+parser.add_argument("-p", "--check-property",
+        help="checks only these property",
+        action="append",
         type=str)
 
 parser.add_argument("file",
@@ -78,19 +72,17 @@ def perform_analyses():
             print(f"cannot parse {f}; skipping it", file = sys.stderr)
             continue
         analysis = Analysis(f, formula)
-        if args.only_check:
-            analysis.perform_test(*provable_properties[args.only_check])
-        else:
-            analysis.perform_test("progress", "deadlock")
-            if formula.bound_to.has_critical_sections:
-                analysis.perform_test("mutual exclusion", "nomutex")
+        properties = (args.check_property if args.check_property else
+            formula.properties)
+        for p in properties:
+            analysis.perform_test(p)
         if args.statistics:
             analysis.print_statistics(without_header=not first,
                     small=not args.verbose)
         else:
             for r in analysis.results:
-                msg = "proven" if r.success else "failed"
-                print(f"{analysis.filename_short}: {r.property_name}: {msg}")
+                msg = "disproven" if r.success else "potentially possible"
+                print(f"{analysis.filename_short}: reachability of {r.property_name}: {msg}")
                 if not r.success:
                     print(f"Potential counter-example:\n{r.model}")
 

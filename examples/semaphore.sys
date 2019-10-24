@@ -2,7 +2,6 @@ Component Task
 initial waiting;
 waiting -> start -> critical;
 critical -> stop -> waiting;
-critical critical;
 
 Component Semaphore
 initial free;
@@ -12,3 +11,5 @@ busy -> release -> free;
 Formula
 ex p: true. start(p) & aquire(0);
 ex p: true. stop(p) & release(0);
+
+nomutex: "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in critical & j in critical"

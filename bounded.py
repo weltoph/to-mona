@@ -63,6 +63,9 @@ class BoundedInteraction(Interaction):
     clauses: List[BoundedClause]
     bound_to: System
 
+    def __post_init__(self):
+        self.properties = {}
+
     @classmethod
     def bind_to(cls, interaction: Interaction, to: System):
         return BoundedInteraction(

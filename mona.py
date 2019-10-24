@@ -65,18 +65,17 @@ class Analysis:
         else:
             self.filename_short = self.filename[:20]
 
-    def _create_proof_script(self, property: str, test: str,
-            minimal_amount) -> str:
+    def _create_proof_script(self, property: str, minimal_amount) -> str:
         template = env.get_template('property_proof.mona')
-        script = template.render(test=test, theory=self.theory,
+        script = template.render(test=property, theory=self.theory,
                 minimal_amount=minimal_amount, formula=self.formula)
         return write_tmp_file(script)
 
-    def perform_test(self, property: str, test: str, minimal_amount: int = 2):
+    def perform_test(self, property: str, minimal_amount: int = 2):
         start_test = datetime.datetime.now()
 
         start_proof_script = datetime.datetime.now()
-        proof_script = self._create_proof_script(property, test, minimal_amount)
+        proof_script = self._create_proof_script(property, minimal_amount)
         delta_proof_script = datetime.datetime.now() - start_proof_script
 
         start_mona_call = datetime.datetime.now()
@@ -205,9 +204,9 @@ def deadlock(formula: BoundedInteraction) -> str:
     template = env.get_template('deadlock.mona')
     return template.render(formula=formula)
 
-def mutual_exclusion_violated(formula: BoundedInteraction) -> str:
-    template = env.get_template('mutex.mona')
-    return template.render(formula=formula)
+def render_property(formula: BoundedInteraction, name: str, content: str) -> str:
+    template = env.get_template('property.mona')
+    return template.render(formula=formula, name=name, content=content)
 
 def theory(formula: BoundedInteraction) -> str:
     theory = "\n".join(
@@ -223,9 +222,12 @@ def theory(formula: BoundedInteraction) -> str:
                 intersection(formula),
                 marking(formula),
                 constraints(formula),
-                deadlock(formula),
-                mutual_exclusion_violated(formula)
-            ])
+            ]
+            + [
+                render_property(formula, name, content) for name, content
+                in formula.properties.items()
+            ]
+            )
     template = env.get_template('theory.mona')
     return template.render(theory_content=theory, formula=formula)
 

@@ -1,6 +1,5 @@
 {% import 'macros.mona' as macros %}
 
-{% call macros.pred_def("deadlock", formula.bound_to.states, []) -%}
 {% call(clause) macros.blockify("&", formula.clauses) %}
 all1 {{ macros.join(clause.existential_terms|map("render_term_filter")) }}: (
   (
@@ -9,5 +8,4 @@ all1 {{ macros.join(clause.existential_terms|map("render_term_filter")) }}: (
     {{ macros.pred_call("dead_transition_" ~ clause.index, formula.bound_to.states, clause.existential_terms) }}
   )
 )
-{%- endcall %}
 {%- endcall %}

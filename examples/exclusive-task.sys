@@ -3,8 +3,9 @@ initial idle;
 idle -> startExecution -> executing;
 executing -> stopExecution -> idle;
 idle -> isIdle -> idle;
-critical executing;
 
 Formula
 ex p: true. startExecution(p) with all o: o ~= p. isIdle(o);
 ex p: true. stopExecution(p);
+
+nomutex: "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in executing & j in executing"

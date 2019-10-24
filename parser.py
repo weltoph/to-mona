@@ -3,20 +3,22 @@ from lark import Lark, Transformer
 from system import Component, System
 from formula import *
 from bounded import *
-from mona import theory
+from mona import deadlock
 
 class ParserError(Exception):
     pass
 
 grammar = """
-    start: component+ formula
-    component: "Component" NAME initial_state transition+ [critical_states]
+    start: component+ formula [properties]
+    component: "Component" NAME initial_state transition+
     ?initial_state: "initial" NAME ";"
-    ?critical_states: "critical" state_list ";"
 
     state_list: state | state "," state_list
     state: NAME
     transition: NAME "->" NAME "->" NAME ";"
+
+    properties: property | [property]+ property
+    property: NAME ":" STRING
 
     formula: "Formula" clause+
     clause: "ex" var_list ":" comparison_formula "." ports ["with" broadcasts]";"
@@ -52,6 +54,7 @@ grammar = """
 
     %import common.INT
     %import common.CNAME -> NAME
+    %import common.ESCAPED_STRING -> STRING
     %import common.WS
     %import common.NEWLINE
     %ignore WS
@@ -72,12 +75,8 @@ class Transformation(Transformer):
     def component(self, args):
         name = str(args.pop(0))
         initial = str(args.pop(0))
-        if type(args[-1]) is list:
-            critical_states = args.pop()
-        else:
-            critical_states = []
         transitions = args
-        component = Component(name, initial, transitions, critical_states)
+        component = Component(name, initial, transitions)
         self.components.append(component)
         return component
 
@@ -162,14 +161,33 @@ class Transformation(Transformer):
         return Constant(int(args.pop()))
 
     def start(self, args):
-        components = args[:-1]
+        last = args.pop()
+        if type(last) is Interaction:
+            properties = []
+            formula = last
+        elif type(last) is list:
+            properties = last
+            formula = args.pop()
+        else:
+            raise ParserError()
+        components = args
         system = System(components)
-        formula = args[-1]
         bounded_formula = BoundedInteraction.bind_to(formula, system)
+        bounded_formula.properties["deadlock"] = deadlock(bounded_formula)
+        for name, content in properties:
+            bounded_formula.properties[name] = content
         return bounded_formula
 
     def state(self, args):
         return [str(args.pop())]
+
+    def properties(self, args):
+        return args
+
+    def property(self, args):
+        name = str(args.pop(0))
+        content = str(args.pop(0))[1:-1]
+        return (name, content)
 
     def state_list(self, args):
         if len(args) == 1:

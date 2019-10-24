@@ -7,12 +7,11 @@ ready -> startExecution -> executing;
 executing -> getPreempted -> preempted;
 preempted -> resumeExecution -> executing;
 executing -> stopExecution -> waiting;
-critical executing;
 
 Component Bit
 initial notPreempted;
-notPreempted -> setPreempted -> preempted;
-preempted -> unsetPreempted -> notPreempted;
+notPreempted -> setPreempted -> isPreempted;
+isPreempted -> unsetPreempted -> notPreempted;
 notPreempted -> isNot -> notPreempted;
 
 Formula
@@ -20,3 +19,5 @@ ex i: i = 0 . zero(i) with all j: i < j. other(j);
 ex i: true . getReady(i);
 ex i, j: i ~= j . startExecution(i) & getPreempted(j) & setPreempted(j);
 ex i, j: i ~= j . stopExecution(i) & resumeExecution(j) & unsetPreempted(j) with all k: j < k . isNot(k);
+
+nomutex: "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in executing & j in executing"
