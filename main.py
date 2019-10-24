@@ -1,3 +1,4 @@
+#!python3
 from parser import parse
 from mona import Analysis, list_all_models
 
