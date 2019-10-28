@@ -1,17 +1,18 @@
-Component philosopher
-initial waiting;
-waiting -> grabFirst -> hungry;
-hungry -> grabSecond -> eating;
-eating -> dropBoth  -> waiting;
+Component philosopher <waiting> {
+  waiting -> grabFirst  -> hungry
+  hungry  -> grabSecond -> eating
+  eating  -> dropBoth   -> waiting
+}
 
-Component fork
-initial free;
-free -> grabbed -> busy;
-busy -> released -> free;
+Component fork <free> {
+  free -> grabbed  -> busy
+  busy -> released -> free
+}
 
-Formula
-ex p: 0 < p.grabFirst(p) & grabbed(p);
-ex p: 0 < p.grabSecond(p) & grabbed(succ(p));
-ex p: 0 = p.grabFirst(p) & grabbed(succ(p));
-ex p: 0 = p.grabSecond(p) & grabbed(p);
-ex p: true.released(p) & dropBoth(p) & released(succ(p));
+Formula {
+  0 ~= p . grabFirst(p)  & grabbed(p);
+  0 ~= p . grabSecond(p) & grabbed(succ0(p));
+           grabFirst(0)  & grabbed(succ0(0));
+           grabSecond(0) & grabbed(0);
+           released(p)   & dropBoth(p) & released(succ0(p));
+}

@@ -1,0 +1,20 @@
+Component philosopher <waiting> {
+  waiting -> grabFirst  -> hungry
+  hungry  -> grabSecond -> eating
+  eating  -> dropBoth   -> waiting
+}
+
+Component fork <free> {
+  free      -> grabbedLeft   -> busyLeft
+  free      -> grabbedRight  -> busyRight
+  busyLeft  -> releasedLeft  -> free
+  busyRight -> releasedRight -> free
+}
+
+Formula {
+  0 < p . grabFirst(p)   & grabbedLeft(p);
+  0 < p . grabSecond(p)  & grabbedRight(succ0(p));
+          grabFirst(0)   & grabbedRight(succ0(0));
+          grabSecond(0)  & grabbedLeft(0);
+          releasedLeft(p) & dropBoth(p) & releasedRight(succ0(p));
+}

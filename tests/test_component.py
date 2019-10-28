@@ -1,6 +1,6 @@
 import unittest
 
-from component import Component, ComponentError
+from system import Component, SystemDefinitionError
 
 class ComponentTest(unittest.TestCase):
     def setUp(self):
@@ -22,9 +22,9 @@ class ComponentTest(unittest.TestCase):
                 ("second", "first"))
 
     def test_inconsistency_detections(self):
-        with self.assertRaises(ComponentError):
+        with self.assertRaises(SystemDefinitionError):
             Component("Test Component", "initial", self.circular_transitions)
-        with self.assertRaises(ComponentError):
+        with self.assertRaises(SystemDefinitionError):
             Component("Test Component", "first", self.same_label_transitions)
 
 

@@ -1,29 +1,42 @@
-Component agent
-initial pc1;
-pc1 -> oneToTwo -> pc2;
-pc2 -> twoToThree -> pc3;
-pc2 -> twoToOne -> pc1;
-pc3 -> threeToFour -> pc4;
-pc4 -> fourToOne -> pc1;
-pc4 -> fourToFive -> pc5;
-pc5 -> fiveToSix -> pc6;
-pc6 -> sixToOne -> pc1;
+Component agent <pc1> {
+  pc1 -> oneToTwo    -> pc2
+  pc2 -> twoToThree  -> pc3
+  pc2 -> twoToOne    -> pc1
+  pc3 -> threeToFour -> pc4
+  pc4 -> fourToOne   -> pc1
+  pc4 -> fourToFive  -> pc5
+  pc5 -> fiveToSix   -> pc6
+  pc6 -> sixToOne    -> pc1
+  pc1 -> is1 -> pc1
+  pc2 -> is2 -> pc2
+  pc3 -> is3 -> pc3
+  pc4 -> is4 -> pc4
+  pc5 -> is5 -> pc5
+  pc6 -> is6 -> pc6
+}
 
-Component region
-initial bottom;
-bottom -> raise -> top;
-bottom -> isBottom -> bottom;
-top -> drop -> bottom;
-top -> isTop -> top;
+Component region <bottom> {
+  bottom -> raise    -> top
+  bottom -> isBottom -> bottom
+  top    -> drop     -> bottom
+  top    -> isTop    -> top
+}
 
-Formula
-ex p: true. oneToTwo(p);
-ex p, w: w < p. isTop(w) & twoToOne(p);
-ex p: true. twoToThree(p) with all s: s < p. isBottom(s);
-ex p: true. threeToFour(p) & raise(p);
-ex p, w: w < p. isTop(w) & fourToOne(p) & drop(p);
-ex p: true. fourToFive(p) with all s: s < p. isBottom(s);
-ex p: true. fiveToSix(p) with all b: p < b. isBottom(b);
-ex p: true. sixToOne(p) & drop(p);
+Formula {
+ oneToTwo(p);
+ w < p. is4(w) & twoToOne(p);
+ w < p. is5(w) & twoToOne(p);
+ w < p. is6(w) & twoToOne(p);
+ twoToThree(p) broadcasting { s: s < p. is1(s) | is2(s) | is3(s) };
+ threeToFour(p);
+ w < p. is4(w) & fourToOne(p);
+ w < p. is5(w) & fourToOne(p);
+ w < p. is7(w) & fourToOne(p);
+ fourToFive(p) broadcasting { s: s < p. is1(s) | is2(s) | is3(s) };
+ fiveToSix(p)  broadcasting { b: p < b. is1(b) | is2(b) | is3(b) };
+ sixToOne(p);
+}
 
-nomutex: "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in pc6 & j in pc6"
+property "nomutex" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in pc6 & j in pc6"
+}

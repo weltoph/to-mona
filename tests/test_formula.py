@@ -23,14 +23,14 @@ class FormulaTest(unittest.TestCase):
 
     def test_consistency_broadcast(self):
         try:
-            Broadcast(self.x, self.guard_x, self.port_x)
+            Broadcast(self.x, self.guard_x, self.port_x, 0)
         except:
             self.fail("unexpected raise of Exception on creation of Broadcast")
         with self.assertRaises(FormulaError):
-            Broadcast(self.x, self.guard_y, self.port_y)
+            Broadcast(self.x, self.guard_y, self.port_y, 0)
 
     def test_free_variables_broadcast(self):
-        b = Broadcast(self.x, self.guard_xy, self.port_succ_x)
+        b = Broadcast(self.x, self.guard_xy, self.port_succ_x, 0)
         self.assertEqual(b.free_variables, {self.y})
 
 if __name__ == '__main__':
