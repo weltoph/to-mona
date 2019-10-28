@@ -1,0 +1,10 @@
+Component level
+initial one;
+one -> toTwo -> two;
+two -> toThree -> three;
+three -> toOne -> one;
+
+Formula
+ex i: true. toTwo(i) & toTwo(succ(i));
+ex i: true. toThree(i) & toThree(succ(i));
+ex i: true. toOne(i) & toOne(succ(i));

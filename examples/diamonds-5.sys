@@ -1,0 +1,14 @@
+Component level
+initial one;
+one -> toTwo -> two;
+two -> toThree -> three;
+three -> toFour -> four;
+four -> toFive -> five;
+five -> toOne -> one;
+
+Formula
+ex i: true. toTwo(i) & toTwo(succ(i));
+ex i: true. toThree(i) & toThree(succ(i));
+ex i: true. toFour(i) & toFour(succ(i));
+ex i: true. toFive(i) & toFive(succ(i));
+ex i: true. toOne(i) & toOne(succ(i));
