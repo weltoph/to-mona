@@ -1,5 +1,7 @@
-from typing import List, Set, Optional, Tuple
+from typing import List, Set, Optional, Tuple, Dict
 from dataclasses import dataclass
+from formula import Clause
+from enum import Enum, unique
 
 class SystemDefinitionError(Exception):
     pass
@@ -33,7 +35,6 @@ class Component:
             else:
                 collection_by_label[l] = transitions.pop()
         # TODO: maybe check for connectivity
-
         self.transition_by_label = collection_by_label
         self.states = sorted(list(states))
 
@@ -64,9 +65,17 @@ class Component:
         except TypeError:
             return None
 
+@unique
+class SystemAddition(Enum):
+    PROPERTY = "property"
+    ASSUMPTION = "assumption"
+
 @dataclass
 class System:
     components: List[Component]
+    interaction: List[Clause]
+    assumptions: Dict[str, str]
+    properties: Dict[str, str]
 
     def __post_init__(self):
         self.components_of_labels = {

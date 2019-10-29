@@ -9,9 +9,7 @@ grammar = """
 
     components: component (component)*
 
-    mona_additions: mona_addition (mona_addition)*
-
-    mona_addition: (custom_property|custom_assumption) (custom_property|custom_assumption)*
+    mona_additions: (custom_property|custom_assumption) (custom_property|custom_assumption)*
 
     custom_property: "property" STRING "{" STRING "}"
 
@@ -197,9 +195,55 @@ class ClauseParser(Transformer):
         return Clause(RestrictionConjunction([]), PredicateConjunction(set()),
                 broadcasts)
 
+    def interaction(self, clauses):
+        return clauses
+
+class ComponentParser(Transformer):
+    @v_args(inline=True)
+    def transition(self, source, port, target):
+        return (source, port, target)
+
+    @v_args(inline=True)
+    def component(self, name, initial, *transitions):
+        from system import Component
+        return Component(name, initial, transitions)
+
+    def components(self, components):
+        return components
+
+class PropertyParser(Transformer):
+    @v_args(inline=True)
+    def custom_property(self, name, value):
+        from system import SystemAddition
+        return (SystemAddition.PROPERTY, str(name)[1:-1], str(value)[1:-1])
+
+    @v_args(inline=True)
+    def custom_assumption(self, name, value):
+        from system import SystemAddition
+        return (SystemAddition.ASSUMPTION, str(name)[1:-1], str(value)[1:-1])
+
+    def mona_additions(self, additions):
+        return additions
+
+class SystemParser(Transformer):
+    @v_args(inline=True)
+    def plain_system(self, components, interaction):
+        from system import System
+        return System(components, interaction, {}, {})
+
+    @v_args(inline=True)
+    def restricted_system(self, components, interaction, additions):
+        from system import System, SystemAddition
+        return System(components, interaction,
+                {name: value for kind, name, value in additions
+                    if kind == SystemAddition.ASSUMPTION},
+                {name: value for kind, name, value in additions
+                    if kind == SystemAddition.PROPERTY})
+
+
 if __name__ == "__main__":
     import sys
-    files = [filename for filename in sys.argv[1:] if filename[-3:] == "sys"]
+    files = [filename for filename in sys.argv[1:] if filename.endswith(".sys")]
     for filename in files:
         try:
             print(filename)
@@ -207,8 +251,10 @@ if __name__ == "__main__":
                 text = f.read()
                 transformer = (TermParser() * PredicateParser()
                         * RestrictionParser() * GuardParser()
-                        * BroadcastParser() * ClauseParser())
-                tree = transformer.transform(parser.parse(text))
-                print(tree.pretty())
+                        * BroadcastParser() * ClauseParser()
+                        * ComponentParser() * PropertyParser()
+                        * SystemParser())
+                system = transformer.transform(parser.parse(text))
+                print(system)
         except IsADirectoryError:
             continue

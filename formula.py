@@ -119,10 +119,6 @@ class Successor(Term):
                 and self.index == other.index)
 
     @property
-    def trivial_term(self) -> bool:
-        return False
-
-    @property
     def variables(self) -> Set[Variable]:
         return self.argument.variables
 
@@ -301,7 +297,7 @@ class RestrictionCollection(Restriction):
             set()))
 
     def rename(self, renaming) -> "RestrictionCollection":
-        return type(self)({r.rename(renaming) for r in self.restrictions})
+        return type(self)([r.rename(renaming) for r in self.restrictions])
 
     def __str__(self) -> str:
         restrictions = f" {self.comparison_symbol} ".join(
@@ -342,6 +338,10 @@ class Broadcast(Formula):
         return self.guard.variables - {self.variable}
 
     @property
+    def variables(self) -> Set[Variable]:
+        return self.guard.variables | {self.variable}
+
+    @property
     def all_terms(self) -> Set[Term]:
         terms = {self.variable}
         terms |= self.guard.all_terms
@@ -362,91 +362,55 @@ class Clause(Formula):
     ports: PredicateConjunction
     broadcasts: List[Broadcast]
 
-#     def _check_for_unknowns(self) -> None:
-#         used_variables = set()
-#         for p in self.ports:
-#             used_variables |= p.variables
-#         for b in self.broadcasts:
-#             used_variables |= b.free_variables
-#         used_variables |= self.guard.variables
-#         unknowns = {g for g in used_variables if not g in self.variables}
-#         if unknowns:
-#             raise FormulaError(f"{unknowns} are not quantified but used")
+    @property
+    def free_variables(self) -> Set[Variable]:
+        free_local_variables = self.ports.variables | self.guard.variables
+        broadcast_variables = set()
+        for b in self.broadcasts:
+            broadcast_variables |= b.free_variables
+        return free_local_variables | broadcast_variables
 
-#     def _check_for_unnecessary_quantification(self) -> None:
-#         used_variables = set()
-#         for p in self.ports:
-#             used_variables |= p.variables
-#         unneeded = {g for g in self.variables if g not in used_variables}
-#         if unneeded:
-#             raise FormulaError(f"{unneeded} are quantified but not used")
+    @property
+    def sorted_free_variables(self) -> List[Variable]:
+        return [t for t in self.sorted_terms if t in self.free_variables]
 
-#     def __post_init__(self):
-#         self._check_for_unknowns()
-#         self._check_for_unnecessary_quantification()
-#         unique_var_list = [v for i, v in enumerate(self.variables)
-#                 if not v in self.variables[:i]]
-#         renaming = {v.name: f"x{i}" for i, v in enumerate(unique_var_list)}
-#         self.variables = [v.rename(renaming) for v in unique_var_list]
-#         self.guard = self.guard.rename(renaming)
-#         self.ports = [p.rename(renaming) for p in self.ports]
-#         broadcasts = []
-#         for i, b in enumerate(self.broadcasts):
-#             renaming[b.variable.name] = f"x{len(self.variables) + i}"
-#             broadcasts.append(b.rename(renaming))
-#         self.broadcasts = broadcasts
+    @property
+    def variables(self) -> Set[Variable]:
+        local_variables = self.ports.variables | self.guard.variables
+        broadcast_variables = set()
+        for b in self.broadcasts:
+            broadcast_variables |= b.variables
+        return local_variables | broadcast_variables
 
-#     @property
-#     def terms_in_guard(self) -> List[Term]:
-#         ret = list(self.variables)
-#         ret += self.guard.terms
-#         for p in self.ports:
-#             ret += p.terms
-#         return [t for i, t in enumerate(ret) if t not in ret[:i]]
+    def __post_init__(self):
+        # renaming process
+        renaming = {v.name: f"x{i}" for i, v in enumerate(self.free_variables)}
+        self.guard = self.guard.rename(renaming)
+        self.ports = self.ports.rename(renaming)
+        broadcasts = []
+        for i, b in enumerate(self.broadcasts):
+            renaming[b.variable.name] = f"x{len(self.variables) + i}"
+            broadcasts.append(b.rename(renaming))
+        self.broadcasts = broadcasts
 
-#     @property
-#     def contains_not_trivial_existential_term(self) -> bool:
-#         return any([not t.trivial_term for t in self.existential_terms])
+    @property
+    def all_terms(self) -> Set[Term]:
+        terms = self.guard.all_terms | self.ports.all_terms
+        for b in self.broadcasts:
+            terms |= b.all_terms
+        return terms
 
-#     @property
-#     def terms(self) -> List[Term]:
-#         ret = self.terms_in_guard
-#         for b in self.broadcasts:
-#             ret += b.terms
-#         return [t for i, t in enumerate(ret) if t not in ret[:i]]
+    @property
+    def free_terms(self) -> List[Term]:
+        return [t for t in self.sorted_terms
+                if t.variables.issubset(self.free_variables) and t.variables]
 
-#     @property
-#     def existential_terms(self) -> List[Term]:
-#         return [t for t in self.terms if t.variable in self.variables]
+    @property
+    def complex_constant_terms(self) -> List[Term]:
+        res = [t for t in self.complex_terms
+                if not t.is_constant and not t.variables]
+        print(res)
+        return res
 
-#     @property
-#     def all_ports(self) -> List[Predicate]:
-#         all_ports = self.ports
-#         for b in self.broadcasts:
-#             all_ports += [b.port]
-#         return [p for i, p in enumerate(all_ports) if not p in all_ports[:i]]
-
-#     @property
-#     def broadcast_terms(self) -> List[Term]:
-#         return [t for t in self.terms if t not in self.terms_in_guard]
-
-#     def __str__(self):
-#         variables = ", ".join([str(v) for v in self.variables])
-#         guard = f" {self.guard}."
-#         ports = " & ".join([str(p) for p in self.ports])
-#         if self.broadcasts:
-#             broadcasts = " with " + " & ".join([str(b) for b in self.broadcasts])
-#         else:
-#             broadcasts = ""
-#         return f"{variables}:{guard} {ports}{broadcasts}"
-
-# @dataclass
-# class Interaction(Formula):
-#     clauses: List[Clause]
-
-#     @property
-#     def ports(self) -> List[Predicate]:
-#         ports = []
-#         for c in self.clauses:
-#             ports += c.ports
-#         return [p for i, p in enumerate(ports) if not p in ports[:i]]
+    def __str__(self):
+        return f"Clause({self.guard}, {self.ports}, {self.broadcasts})"
