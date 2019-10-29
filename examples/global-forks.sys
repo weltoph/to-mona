@@ -1,0 +1,20 @@
+Component philosopher <waiting> {
+  waiting -> grabLeft  -> hungry
+  hungry  -> grabRight -> eating
+  eating  -> dropBoth  -> waiting
+}
+
+Component fork <free> {
+  free -> grabbed  -> busy
+  busy -> released -> free
+}
+
+Formula {
+  grabbed(root.0)  & grabLeft(p);
+                     grabRight(p) & grabbed(root.1);
+  released(root.0) & dropBoth(p)  & released(root.1);
+}
+
+assumption "linear" {
+  "all1 x: x in U => last1(x)"
+}

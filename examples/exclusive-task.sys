@@ -1,0 +1,14 @@
+Component Task <idle> {
+  idle      -> startExecution -> executing
+  executing -> stopExecution  -> idle
+  idle      -> isIdle         -> idle
+}
+
+Formula {
+  startExecution(p) broadcasting { o: o ~= p. isIdle(o) };
+  stopExecution(p);
+}
+
+property "nomutex" {
+  "ex1 i, j: i in U & j in U & i ~= j & i in executing & j in executing"
+}

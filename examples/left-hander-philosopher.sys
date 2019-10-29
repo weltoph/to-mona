@@ -10,9 +10,13 @@ Component fork <free> {
 }
 
 Formula {
-  0 ~= p . grabFirst(p)  & grabbed(p);
-  0 ~= p . grabSecond(p) & grabbed(succ0(p));
-           grabFirst(0)  & grabbed(succ0(0));
-           grabSecond(0) & grabbed(0);
-           released(p)   & dropBoth(p) & released(succ0(p));
+  root < p . grabFirst(p)     & grabbed(p);
+  root < p . grabSecond(p)    & grabbed(succ0(p));
+             grabFirst(root)  & grabbed(root.0);
+             grabSecond(root) & grabbed(root);
+             released(p)      & dropBoth(p) & released(succ0(p));
+}
+
+assumption "linear" {
+  "all1 x: x in U => last1(x)"
 }

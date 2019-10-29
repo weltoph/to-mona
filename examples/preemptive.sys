@@ -9,12 +9,12 @@ Component Task <init> {
 }
 
 Formula {
-            zero(0) broadcasting { j: 0 < j. other(j) };
+            zero(root) broadcasting { j: root ~= j. other(j) };
             getReady(i);
    i ~= j . startExecution(i) & getPreempted(j);
    i ~= j . stopExecution(i)  & resumeExecution(j);
 }
 
 property "nomutex" {
-  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in executing & j in executing"
-  }
+  "ex1 i, j: i in U & j in U & i ~= j & i in executing & j in executing"
+}

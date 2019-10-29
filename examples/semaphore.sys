@@ -1,0 +1,18 @@
+Component Task <waiting> {
+  waiting -> start -> critical
+  critical -> stop -> waiting
+}
+
+Component Semaphore <free> {
+  free -> aquire -> busy
+  busy -> release -> free
+}
+
+Formula {
+  start(p) & aquire(root);
+  stop(p)  & release(root);
+}
+
+property "nomutex" {
+  "ex1 i, j: i in U & j in U & i ~= j & i in critical & j in critical"
+}

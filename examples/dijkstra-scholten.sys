@@ -1,0 +1,28 @@
+Component Element <A> {
+  A -> first  -> B
+  B -> second -> C
+  C -> third  -> D
+  D -> fourth -> A
+  A -> isA    -> A
+  B -> isB    -> B
+  C -> isC    -> C
+  D -> isD    -> D
+}
+
+Formula {
+  first(root);
+  fourth(root);
+  last0(p) & last1(p) . second(p);
+  last0(p) & last1(p) . third(p);
+
+  last0(p) . second(p) & first(succ1(p));
+  last1(p) . second(p) & first(succ0(p));
+             second(p) & first(succ1(p)) & second(succ0(p));
+
+  last0(p) . third(p) & fourth(succ1(p));
+  last1(p) . third(p) & fourth(succ0(p));
+             third(p) & fourth(succ1(p)) & fourth(succ0(p));
+
+  last0(p) & last1(p) . second(p);
+  last0(p) & last1(p) . third(p);
+}
