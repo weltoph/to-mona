@@ -31,7 +31,7 @@ Formula {
  threeToFour(p);
  w < p. is4(w) & fourToOne(p);
  w < p. is5(w) & fourToOne(p);
- w < p. is7(w) & fourToOne(p);
+ w < p. is6(w) & fourToOne(p);
  fourToFive(p) broadcasting { s: s < p. is1(s) | is2(s) | is3(s) };
  fiveToSix(p)  broadcasting { b: p < b. is1(b) | is2(b) | is3(b) };
  sixToOne(p);

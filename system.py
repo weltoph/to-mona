@@ -86,6 +86,14 @@ class System:
         sum_of_labels = sum([c.number_of_labels for c in self.components])
         if len(all_labels) != sum_of_labels:
             raise SystemDefinitionError(f"Not disjoint labels in components!")
+        for clause in self.interaction:
+            for predicate in clause.predicates:
+                edge = self.edge_with_label(predicate.name)
+                if not edge:
+                    raise SystemDefinitionError(
+                            f"{predicate.name} unknown in system")
+                predicate.bind(*edge)
+
 
     @property
     def states(self) -> Set[str]:

@@ -13,20 +13,21 @@ marking properties:
 */
 all1 m: (0 <= m & m < n) => (
 {% for c in system.components %}
-# considering component {{ c.name }}
-{% if not loop.first %}& {% endif %}(
-{% for s in c.states %}
-# case {{ s }} is marked
-m in {{ s }}
-{% if c.states|length > 1 %}
-# but others are not
-{% for o in c.states|reject("sameas", s) %}
-& m notin {{ o }}
-{% endfor %}
-{% endif %}
-{% endfor %}
-)
-{% endfor %}
+  # considering component {{ c.name }}
+  {% if not loop.first %}& {% endif %}(
+  {% for s in c.states -%}
+    {% if not loop.first %} | {% endif %}(
+    # case {{ s }} is marked
+    m in {{ s }}
+    {% if c.states|length > 1 -%}
+    # but others are not
+    {% for o in c.states|reject("sameas", s) %} & m notin {{ o }}
+    {%- endfor %}
+    {%- endif %}
+    )
+  {%- endfor %}
+  )
+  {%- endfor %}
 );
 
 /* define looping is_next notion */
@@ -41,13 +42,20 @@ pred is_last(var1 last) = (
 );
 
 /* define an intersection between two sets */
-{{ system|intersection_predicate }}
+{{ intersection_predicate(system) }}
 
 /* define a unique intersection between two sets */
-{{ system|unique_intersection_predicate }}
+{{ unique_intersection_predicate(system) }}
 
 /* define an intersection with the initial marking */
-{{ system|intersects_initial_predicate }}
+{{ intersects_initial_predicate(system) }}
 
 /* define a unique intersection with the initial marking */
-{{ system|uniquely_intersects_initial_predicate }}
+{{ uniquely_intersects_initial_predicate(system) }}
+
+/* define transition predicates: */
+{% for clause in system.interaction %}
+{{ transition_dead_predicate(system, clause, loop.index) }}
+
+{{ transition_trap_predicate(system, clause, loop.index) }}
+{% endfor %}

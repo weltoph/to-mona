@@ -78,7 +78,7 @@ class TermParser(Transformer):
     @v_args(inline=True)
     def constant(self, value):
         from formula import Constant
-        return Constant(value)
+        return Constant(int(value))
 
     @v_args(inline=True)
     def succ(self, term):
@@ -107,15 +107,15 @@ class PredicateParser(Transformer):
 class RestrictionParser(Transformer):
     @v_args(inline=True)
     def comparison(self, left, symbol, right):
-        from formula import Below, BelowEqual, Above, AboveEqual
+        from formula import Less, LessEqual, Greater, GreaterEqual
         from formula import Equal, Unequal
         lookup = {
                 "~=": Unequal,
                 "=" : Equal,
-                "<" : Below,
-                "<=": BelowEqual,
-                ">" : Above,
-                ">=": AboveEqual,
+                "<" : Less,
+                "<=": LessEqual,
+                ">" : Greater,
+                ">=": GreaterEqual,
                 }
         return lookup[str(symbol)](left, right)
 

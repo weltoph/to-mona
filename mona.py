@@ -1,5 +1,6 @@
 from typing import List, Tuple, Dict, Optional, Union
 from dataclasses import dataclass
+
 class MonaError(Exception):
     pass
 
@@ -30,6 +31,8 @@ class StatementChain(Formula):
     statements: List[Formula]
 
     def render(self) -> str:
+        if not self.statements:
+            return f"( {self.empty_value} )"
         statements = f" {self.comp_symb} ".join(
                 [s.render() for s in self.statements])
         return f"( {statements} )"
@@ -40,25 +43,27 @@ class Conjunction(StatementChain):
     def comp_symb(self) -> str:
         return "&"
 
+    @property
+    def empty_value(self):
+        return "true"
+
 @dataclass
 class Disjunction(StatementChain):
     @property
     def comp_symb(self) -> str:
         return "|"
 
+    @property
+    def empty_value(self):
+        return "false"
+
 @dataclass
-class BinaryConnective(Formula):
+class Implication(Formula):
     left: Formula
     right: Formula
 
     def render(self) -> str:
-        return f"( ({self.left.render()}) {self.conn_symb} ({self.right.render()}) )"
-
-@dataclass
-class Implication(BinaryConnective):
-    @property
-    def conn_symb(self) -> str:
-        return "=>"
+        return f"( ({self.left.render()}) => ({self.right.render()}) )"
 
 @dataclass
 class Negation(Formula):
@@ -86,6 +91,12 @@ class Comparison(Atom):
         return f"({self.left.render()} {self.comp_symb} {self.right.render()})"
 
 @dataclass
+class Unequal(Comparison):
+    @property
+    def comp_symb(self) -> str:
+        return "~="
+
+@dataclass
 class Equal(Comparison):
     @property
     def comp_symb(self) -> str:
@@ -102,6 +113,19 @@ class LessEqual(Comparison):
     @property
     def comp_symb(self) -> str:
         return "<="
+
+@dataclass
+class Greater(Comparison):
+    @property
+    def comp_symb(self) -> str:
+        return ">"
+
+@dataclass
+class GreaterEqual(Comparison):
+    @property
+    def comp_symb(self) -> str:
+        return ">="
+
 
 
 @dataclass
@@ -136,16 +160,18 @@ class ElementNotIn(Participation):
 @dataclass
 class PredicateCall(Atom):
     name: str
-    variables: List[Union[Variable, str]]
+    variables: Union[List[Union[Variable, str]], Union[Variable, str]]
 
     def __post_init__(self):
+        self.variables = (self.variables if type(self.variables) == list
+                else [self.variables])
         self.variables = [
                 (Variable(v) if type(v) is str else v)
                 for v in self.variables]
 
     def render(self) -> str:
         variables = ", ".join([v.render() for v in self.variables])
-        return f"{name}({variables})"
+        return f"{self.name}({variables})"
 
 @dataclass
 class Quantification(Formula):
@@ -160,8 +186,11 @@ class Quantification(Formula):
                 for v in self.variables]
 
     def render(self) -> str:
+        if not self.variables:
+            return f"( {self.render_inner()} )"
         variables = ", ".join([v.render() for v in self.variables])
-        return f"{self.kind}{self.order} {variables}: ( {self.render_inner()} )"
+        quantification = f"{self.kind}{self.order} {variables}"
+        return f"{quantification}: ( {self.render_inner()} )"
 
     def render_inner(self) -> str:
         return self.inner.render()
@@ -214,7 +243,10 @@ class UniversalFirstOrder(Quantification):
     def render_inner(self) -> str:
         guards = Conjunction([LessEqual(Constant(0), v)
             for v in self.variables] + [Less(v, "n") for v in self.variables])
-        return f"({guards.render()}) => ({self.inner.render()})"
+        if guards:
+            return f"({guards.render()}) => ({self.inner.render()})"
+        else:
+            return f"({self.inner.render()})"
 
 @dataclass
 class PredicateDefinition(Formula):
@@ -233,8 +265,11 @@ class PredicateDefinition(Formula):
 
     @property
     def variable_list(self) -> str:
+        print(self.second_order)
         return ", ".join([f"var2 {v.render()}" for v in self.second_order]
                 + [f"var1 {v.render()}" for v in self.first_order])
 
     def render(self) -> str:
-        return f"pred {self.name}({self.variable_list}) = (\n{self.inner.render()}\n);"
+        return (f"pred {self.name}({self.variable_list}) = (\n"
+                + f"{self.inner.render()}\n"
+                + f");")

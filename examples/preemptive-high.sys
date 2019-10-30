@@ -12,7 +12,7 @@ Component Task <init> {
 }
 
 Formula {
-          zero(root) broadcasting { j: root < j. other(j) };
+          zero(0) broadcasting { j: 0 ~= j. other(j) };
           getReady(i);
   i < j . startExecution(i) & getPreempted(j);
   i < j . stopExecution(i)  & resumeExecution(j) broadcasting{ k: j < k . isWaiting(k) | isReady(k) | isExecuting(k) };
