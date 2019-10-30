@@ -10,19 +10,14 @@ Component Element <A> {
 }
 
 Formula {
-  first(root);
-  fourth(root);
-  last0(p) & last1(p) . second(p);
-  last0(p) & last1(p) . third(p);
+  first(0);
+  fourth(0);
+  last(p) . second(p);
+  last(p) . third(p);
 
-  last0(p) . second(p) & first(succ1(p));
-  last1(p) . second(p) & first(succ0(p));
-             second(p) & first(succ1(p)) & second(succ0(p));
+  # propagate to the right
+  p < q & q = succ(p) . second(p) & first(q);
 
-  last0(p) . third(p) & fourth(succ1(p));
-  last1(p) . third(p) & fourth(succ0(p));
-             third(p) & fourth(succ1(p)) & fourth(succ0(p));
-
-  last0(p) & last1(p) . second(p);
-  last0(p) & last1(p) . third(p);
+  # propagate to the left
+  p < q & q = succ(p) . third(p) & fourth(q);
 }

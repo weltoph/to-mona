@@ -10,9 +10,9 @@ Component fork <free> {
 }
 
 Formula {
-  grabbed(root.0)  & grabLeft(p);
-                     grabRight(p) & grabbed(root.1);
-  released(root.0) & dropBoth(p)  & released(root.1);
+  grabbed(0)  & grabLeft(p);
+                grabRight(p) & grabbed(1);
+  released(0) & dropBoth(p)  & released(1);
 }
 
 assumption "linear" {

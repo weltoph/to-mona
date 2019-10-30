@@ -63,7 +63,7 @@ class Term(Formula):
 
 @dataclass
 class Constant(Term):
-    value: str
+    value: int
 
     def rename(self, renaming) -> "Constant":
         return Constant(self.value)
@@ -107,23 +107,21 @@ class Variable(Term):
 
 @dataclass
 class Successor(Term):
-    index: int # in {0, 1}
     argument: Term
 
     def __hash__(self):
-        return hash(self.index) & hash(self.argument)
+        return hash(self.argument)
 
     def __eq__(self, other):
         return type(self) == type(other) and (
-                self.argument == other.argument
-                and self.index == other.index)
+                self.argument == other.argument)
 
     @property
     def variables(self) -> Set[Variable]:
         return self.argument.variables
 
     def rename(self, renaming : Dict[str, str]) -> "Successor":
-        return Successor(self.index, self.argument.rename(renaming))
+        return Successor(self.argument.rename(renaming))
 
     @property
     def sub_terms(self) -> Set[Term]:
@@ -203,7 +201,6 @@ class Restriction(Formula):
 
 @dataclass
 class Last(Restriction):
-    index: int
     argument: Term
 
     @property
@@ -215,10 +212,10 @@ class Last(Restriction):
         return self.argument.all_terms
 
     def rename(self, renaming: Dict[str, str]) -> "Last":
-        return Last(self.index, self.argument.rename(renaming))
+        return Last(self.argument.rename(renaming))
 
     def __str__(self):
-        return f"last{self.index}({self.argument})"
+        return f"last({self.argument})"
 
 @dataclass
 class Comparison(Restriction):

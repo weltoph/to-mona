@@ -1,4 +1,5 @@
 from lark import Lark, Transformer, v_args
+from rendering import render_base_theory
 
 class ParserError(Exception):
     pass
@@ -42,8 +43,7 @@ grammar = """
     conjunctive_guard: restriction ("&" restriction)*
 
     restriction: term COMPARISONSYMBOL term -> comparison
-               | "last0(" term ")"          -> last_left
-               | "last1(" term ")"          -> last_right
+               | "last(" term ")"           -> last
 
     COMPARISONSYMBOL: "~=" | "=" | "<" | "<=" | ">" | ">="
 
@@ -52,21 +52,16 @@ grammar = """
 
     predicate: NAME "(" term ")"
 
-    ?term: left_succ
-         | right_succ
+    ?term: succ
          | variable
          | constant
 
     variable: NAME
 
-    left_succ:  "succ0(" term ")"
-    right_succ: "succ1(" term ")"
-    constant: "root"                              -> constant_root
-            | constant "."  CONSTANT_PROLONGATION -> constant_term
+    succ:  "succ(" term ")"
+    constant: INT
 
-    CONSTANT_PROLONGATION: ("0"|"1")
-
-    NAME: /(?!(succ0|succ1|last0|last1|root))[a-zA-Z][a-zA-Z0-9]*/
+    NAME: /(?!(succ|last))[a-zA-Z][a-zA-Z0-9]*/
     COMMENT: "#" /.*/ NEWLINE
 
     %import common.INT
@@ -81,24 +76,14 @@ parser = Lark(grammar, start="system")
 
 class TermParser(Transformer):
     @v_args(inline=True)
-    def constant_root(self):
+    def constant(self, value):
         from formula import Constant
-        return Constant("root")
+        return Constant(value)
 
     @v_args(inline=True)
-    def constant_term(self, current, prolongation):
-        from formula import Constant
-        return Constant(f"{current.value}.{str(prolongation)}")
-
-    @v_args(inline=True)
-    def left_succ(self, term):
+    def succ(self, term):
         from formula import Successor
-        return Successor(0, term)
-
-    @v_args(inline=True)
-    def right_succ(self, term):
-        from formula import Successor
-        return Successor(1, term)
+        return Successor(term)
 
     @v_args(inline=True)
     def variable(self, name):
@@ -135,14 +120,9 @@ class RestrictionParser(Transformer):
         return lookup[str(symbol)](left, right)
 
     @v_args(inline=True)
-    def last_left(self, argument):
+    def last(self, argument):
         from formula import Last
-        return Last(0, argument)
-
-    @v_args(inline=True)
-    def last_right(self, argument):
-        from formula import Last
-        return Last(1, argument)
+        return Last(argument)
 
 class GuardParser(Transformer):
     def conjunctive_guard(self, restrictions):
@@ -201,7 +181,7 @@ class ClauseParser(Transformer):
 class ComponentParser(Transformer):
     @v_args(inline=True)
     def transition(self, source, port, target):
-        return (source, port, target)
+        return (str(source), str(port), str(target))
 
     @v_args(inline=True)
     def component(self, name, initial, *transitions):
@@ -255,6 +235,6 @@ if __name__ == "__main__":
                         * ComponentParser() * PropertyParser()
                         * SystemParser())
                 system = transformer.transform(parser.parse(text))
-                print(system)
+                print(render_base_theory(system))
         except IsADirectoryError:
             continue

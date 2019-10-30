@@ -21,7 +21,3 @@ Formula {
 property "nomutex" {
   "ex1 i, j: i in U & j in U & i ~= j & i in executing & j in executing"
 }
-
-assumption "linear" {
-  "all1 x: x in U => last1(x)"
-}
