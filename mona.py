@@ -1,6 +1,8 @@
 from typing import List, Tuple, Dict, Optional, Union
 from dataclasses import dataclass
 
+import formula
+
 class MonaError(Exception):
     pass
 
@@ -265,7 +267,6 @@ class PredicateDefinition(Formula):
 
     @property
     def variable_list(self) -> str:
-        print(self.second_order)
         return ", ".join([f"var2 {v.render()}" for v in self.second_order]
                 + [f"var1 {v.render()}" for v in self.first_order])
 
@@ -273,3 +274,74 @@ class PredicateDefinition(Formula):
         return (f"pred {self.name}({self.variable_list}) = (\n"
                 + f"{self.inner.render()}\n"
                 + f");")
+
+def translate_term(term: formula.Term) -> Term:
+    if type(term) is formula.Constant:
+        return Constant(term.value)
+    elif type(term) is formula.Variable:
+        return Variable(term.name)
+    elif type(term) is formula.Successor:
+        current_term = term.argument
+        prefix = "succ_"
+        while type(current_term) is formula.Successor:
+            prefix += "succ_"
+            current_term = current_term.argument
+        if type(current_term) is formula.Constant:
+            return Variable(f"{prefix}{current_term.value}")
+        elif type(current_term) is formula.Variable:
+            return Variable(f"{prefix}{current_term.name}")
+    else:
+        raise MonaError("Cannot translate {term} to ws1s")
+
+def successor_constraint(succ: formula.Successor) -> PredicateCall:
+    term_var = translate_term(succ)
+    argument_var = translate_term(succ.argument)
+    return PredicateCall("is_next", [argument_var, term_var])
+
+def translate_formula(f: formula.Formula) -> Formula:
+    if type(f) is formula.Last:
+        argument = translate_term(formula.argument)
+        return PredicateCall("is_last", argument)
+    elif type(f) is formula.Less:
+        left = translate_term(f.left)
+        right = translate_term(f.right)
+        return Less(left, right)
+    elif type(f) is formula.LessEqual:
+        left = translate_term(f.left)
+        right = translate_term(f.right)
+        return LessEqual(left, right)
+    elif type(f) is formula.Greater:
+        left = translate_term(f.left)
+        right = translate_term(f.right)
+        return Greater(left, right)
+    elif type(f) is formula.GreaterEqual:
+        left = translate_term(f.left)
+        right = translate_term(f.right)
+        return GreaterEqual(left, right)
+    elif type(f) is formula.Equal:
+        left = translate_term(f.left)
+        right = translate_term(f.right)
+        return Equal(left, right)
+    elif type(f) is formula.Unequal:
+        left = translate_term(f.left)
+        right = translate_term(f.right)
+        return Unequal(left, right)
+    elif type(f) is formula.RestrictionConjunction:
+        return Conjunction([translate_formula(r) for r in f.restrictions])
+    elif type(f) is formula.RestrictionDisjunction:
+        return Disjunction([translate_formula(r) for r in f.restrictions])
+    else:
+        raise MonaError(f"Cannot translate {f} to ws1s")
+
+def translate_guard_and_terms(guarded_statement:
+        Union[formula.Broadcast, formula.Clause]):
+    term_constraints = Conjunction([successor_constraint(t)
+        for t in guarded_statement.local_terms if not t.is_atomic])
+    guard = translate_formula(guarded_statement.guard)
+    return Conjunction([guard, term_constraints])
+
+def get_quantifiable_objects(statement:
+        Union[formula.Broadcast, formula.Clause]):
+    considered_terms = ([t for t in statement.local_terms if (not t.is_atomic)]
+            + statement.local_variables)
+    return [translate_term(t) for t in considered_terms]

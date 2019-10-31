@@ -1,12 +1,10 @@
 from dataclasses import dataclass, field
 from typing import List, Iterable, Set, Dict, Optional
 
-import mona
-
 class FormulaError(Exception):
     pass
 
-class Formula(object):
+class FormulaBase(object):
     def __repr__(self):
         return f"{type(self)}<{str(self)}>"
 
@@ -33,10 +31,6 @@ class Formula(object):
         return sorted(self.all_terms, key=str)
 
     @property
-    def variable_terms(self) -> List["Term"]:
-        return [term for term in self.sorted_terms if not term.is_constant]
-
-    @property
     def complex_terms(self) -> List["Term"]:
         return [term for term in self.sorted_terms if not term.is_atomic]
 
@@ -45,7 +39,10 @@ class Formula(object):
         return [term for term in self.sorted_terms
                 if term.is_atomic and not term.is_constant]
 
-class Term(Formula):
+class Formula(FormulaBase):
+    pass
+
+class Term(FormulaBase):
     @property
     def all_terms(self) -> Set["Term"]:
         return {self} | self.sub_terms
@@ -83,8 +80,6 @@ class Constant(Term):
     def is_constant(self) -> bool:
         return True
 
-    def to_mona(self) -> mona.Constant:
-        return mona.Constant(self.value)
 
 @dataclass
 class Variable(Term):
@@ -110,8 +105,6 @@ class Variable(Term):
     def is_atomic(self) -> bool:
         return True
 
-    def to_mona(self) -> mona.Variable:
-        return mona.Variable(self.name)
 
 @dataclass
 class Successor(Term):
@@ -137,15 +130,6 @@ class Successor(Term):
 
     def __str__(self) -> str:
         return f"succ({self.argument})"
-
-    def to_mona(self) -> mona.Variable:
-        arg = self.argument.to_mona()
-        return mona.Variable(f"succ_{arg.render()}")
-
-    def mona_constraint(self) -> mona.PredicateCall:
-        s = self.to_mona()
-        a = self.argument.to_mona()
-        return mona.PredicateCall("is_next", [a, s])
 
 @dataclass
 class Predicate(Formula):
@@ -256,10 +240,6 @@ class Last(Restriction):
     def __str__(self):
         return f"last({self.argument})"
 
-    def to_mona(self) -> mona.PredicateCall:
-        a = self.argument.to_mona()
-        return mona.PredicateCall("is_last", a)
-
 @dataclass
 class Comparison(Restriction):
     left: Term
@@ -291,17 +271,11 @@ class Less(Comparison):
     def comp_str(self):
         return "<"
 
-    def to_mona(self) -> mona.Less:
-        return mona.Less(self.left.to_mona(), self.right.to_mona())
-
 @dataclass
 class LessEqual(Comparison):
     @property
     def comp_str(self):
         return "<="
-
-    def to_mona(self) -> mona.LessEqual:
-        return mona.LessEqual(self.left.to_mona(), self.right.to_mona())
 
 @dataclass
 class Greater(Comparison):
@@ -309,17 +283,11 @@ class Greater(Comparison):
     def comp_str(self):
         return ">"
 
-    def to_mona(self) -> mona.Greater:
-        return mona.Greater(self.left.to_mona(), self.right.to_mona())
-
 @dataclass
 class GreaterEqual(Comparison):
     @property
     def comp_str(self):
         return ">="
-
-    def to_mona(self) -> mona.GreaterEqual:
-        return mona.GreaterEqual(self.left.to_mona(), self.right.to_mona())
 
 @dataclass
 class Equal(Comparison):
@@ -327,17 +295,11 @@ class Equal(Comparison):
     def comp_str(self):
         return "="
 
-    def to_mona(self) -> mona.Equal:
-        return mona.Equal(self.left.to_mona(), self.right.to_mona())
-
 @dataclass
 class Unequal(Comparison):
     @property
     def comp_str(self):
         return "~="
-
-    def to_mona(self) -> mona.Equal:
-        return mona.Unequal(self.left.to_mona(), self.right.to_mona())
 
 @dataclass
 class RestrictionCollection(Restriction):
@@ -373,17 +335,11 @@ class RestrictionConjunction(RestrictionCollection):
     def comparison_symbol(self) -> str:
         return "&"
 
-    def to_mona(self) -> mona.Conjunction:
-        return mona.Conjunction([r.to_mona() for r in self.restrictions])
-
 @dataclass
 class RestrictionDisjunction(RestrictionCollection):
     @property
     def comparison_symbol(self) -> str:
         return "|"
-
-    def to_mona(self) -> mona.Disjunction:
-        return mona.Disjunction([r.to_mona() for r in self.restrictions])
 
 @dataclass
 class Broadcast(Formula):
@@ -398,28 +354,46 @@ class Broadcast(Formula):
         return Broadcast(variable, guard, body)
 
     def __post_init__(self):
+        # setup caching
+        self._free_variables = None
+        self._variables = None
+        self._all_terms = None
+        self._local_terms = None
         for predicate in self.body.predicates:
             if [self.variable] != predicate.involved_variables:
                 raise FormulaError(f"Broadcast variable mismatch")
 
     @property
+    def local_variables(self) -> List[Variable]:
+        return [self.variable]
+
+    @property
     def free_variables(self) -> Set[Variable]:
-        return self.guard.variables - {self.variable}
+        if self._free_variables: return self._free_variables
+        self._free_variables = self.guard.variables - {self.variable}
+        return self._free_variables
 
     @property
     def variables(self) -> Set[Variable]:
-        return self.guard.variables | {self.variable}
+        if self._variables: return self._variables
+        self._variables = self.guard.variables | {self.variable}
+        return self._variables
 
     @property
     def all_terms(self) -> Set[Term]:
+        if self._all_terms: return self._all_terms
         terms = {self.variable}
         terms |= self.guard.all_terms
         terms |= self.body.all_terms
-        return terms
+        self._all_terms = terms
+        return self._all_terms
 
     @property
     def local_terms(self) -> List[Term]:
-        return [t for t in all_terms if t.variable == self.variable]
+        if self._local_terms: return self._local_terms
+        self._local_terms = [t for t in self.sorted_terms
+                if t.variables.issubset({self.variable}) and t.variables]
+        return self._local_terms
 
     def __str__(self):
         return "broadcasting {{ {variable}: {guard}. {body} }}".format(
@@ -433,23 +407,34 @@ class Clause(Formula):
 
     @property
     def free_variables(self) -> Set[Variable]:
+        if self._free_variables: return self._free_variables
         free_local_variables = self.ports.variables | self.guard.variables
         broadcast_variables = set()
         for b in self.broadcasts:
             broadcast_variables |= b.free_variables
-        return free_local_variables | broadcast_variables
+        self._free_variables = free_local_variables | broadcast_variables
+        return self._free_variables
+
+    @property
+    def local_variables(self) -> List[Variable]:
+        return self.sorted_free_variables
 
     @property
     def predicates(self) -> Set[Predicate]:
+        if self._predicates: return self._predicates
         predicates = set()
         predicates |= self.ports.predicates
         for b in self.broadcasts:
             predicates |= b.body.predicates
-        return predicates
+        self._predicates = predicates
+        return self._predicates
 
     @property
     def sorted_free_variables(self) -> List[Variable]:
-        return [t for t in self.sorted_terms if t in self.free_variables]
+        if self._sorted_free_variables: return self._sorted_free_variables
+        self._sorted_free_variables = [t
+                for t in self.sorted_terms if t in self.free_variables]
+        return self._sorted_free_variables
 
     @property
     def variables(self) -> Set[Variable]:
@@ -457,9 +442,17 @@ class Clause(Formula):
         broadcast_variables = set()
         for b in self.broadcasts:
             broadcast_variables |= b.variables
-        return local_variables | broadcast_variables
+        self._variables = local_variables | broadcast_variables
+        return self._variables
 
     def __post_init__(self):
+        # setup caching
+        self._free_variables = None
+        self._sorted_free_variables = None
+        self._predicates = None
+        self._variables = None
+        self._all_terms = None
+        self._local_terms = None
         # renaming process
         renaming = {v.name: f"x{i}" for i, v in enumerate(self.free_variables)}
         self.guard = self.guard.rename(renaming)
@@ -478,27 +471,29 @@ class Clause(Formula):
                             if (not Unequal(var, v) in conjunct.restrictions
                                 or Unequal(v, var) in conjunct.restrictions)]
                 conjunct.restrictions += disequalities
+        # invalidate caching
+        self._free_variables = None
+        self._sorted_free_variables = None
+        self._predicates = None
+        self._variables = None
+        self._all_terms = None
+        self._local_terms = None
 
     @property
     def all_terms(self) -> Set[Term]:
+        if self._all_terms: return self._all_terms
         terms = self.guard.all_terms | self.ports.all_terms
         for b in self.broadcasts:
             terms |= b.all_terms
-        return terms
+        self._all_terms = terms
+        return self._all_terms
 
     @property
-    def free_terms(self) -> List[Term]:
-        return [t for t in self.sorted_terms
+    def local_terms(self) -> List[Term]:
+        if self._local_terms: return self._local_terms
+        self._local_terms = [t for t in self.sorted_terms
                 if t.variables.issubset(self.free_variables) and t.variables]
-
-    @property
-    def complex_constant_terms(self) -> List[Term]:
-        return [t for t in self.complex_terms
-                if not t.is_constant and not t.variables]
-
-    @property
-    def complex_free_terms(self) -> List[Term]:
-        return [t for t in self.complex_terms if t in self.free_terms]
+        return self._local_terms
 
     def __str__(self):
         return f"Clause({self.guard}, {self.ports}, {self.broadcasts})"

@@ -40,3 +40,7 @@ Formula {
 property "nomutex" {
   "ex1 i, j: i in U & j in U & i ~= j & i in pc6 & j in pc6"
 }
+
+assumption "participants" {
+  "2 <= n"
+}

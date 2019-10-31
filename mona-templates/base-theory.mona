@@ -55,7 +55,18 @@ pred is_last(var1 last) = (
 
 /* define transition predicates: */
 {% for clause in system.interaction %}
+/* introduce predicate to describe deadlock of {{ clause }} */
 {{ transition_dead_predicate(system, clause, loop.index) }}
 
+/* introduce predicate to describe trap condition of {{ clause }} */
 {{ transition_trap_predicate(system, clause, loop.index) }}
 {% endfor %}
+
+/* predicate to describe a deadlock */
+{{ deadlock_predicate(system) }}
+
+/* predicate to describe a trap */
+{{ trap_predicate(system) }}
+
+/* invariant that every initially marked trap has to be marked by any marking */
+{{ trap_invariant(system) }};

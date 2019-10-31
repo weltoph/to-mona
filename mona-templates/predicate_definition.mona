@@ -1,3 +1,0 @@
-pred {{ predicate.name }}({{ predicate.variable_list }}) = (
-{{ predicate.formula }}
-);

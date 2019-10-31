@@ -1,9 +1,0 @@
-{% import 'macros.mona' as macros %}
-
-{% call macros.pred_def("intersects_initial", formula.bound_to.states) -%}
-  ex1 h: (0 <= h & h < n) & (
-    {% call(component) macros.blockify("|", formula.bound_to.components, indentation_depth=4) -%}
-    h in {{ component.initial_state }}
-    {%- endcall %}
-  )
-{%- endcall %}
