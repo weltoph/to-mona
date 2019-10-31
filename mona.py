@@ -26,7 +26,7 @@ class Constant(Term):
     value: int
 
     def render(self) -> str:
-        return self.value
+        return str(self.value)
 
 @dataclass
 class StatementChain(Formula):

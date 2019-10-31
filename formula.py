@@ -80,7 +80,6 @@ class Constant(Term):
     def is_constant(self) -> bool:
         return True
 
-
 @dataclass
 class Variable(Term):
     name: str
@@ -104,7 +103,6 @@ class Variable(Term):
     @property
     def is_atomic(self) -> bool:
         return True
-
 
 @dataclass
 class Successor(Term):
@@ -174,7 +172,9 @@ class Predicate(Formula):
         return self.argument.all_terms
 
     def rename(self, renaming):
-        return Predicate(self.name, self.argument.rename(renaming))
+        new_pred = Predicate(self.name, self.argument.rename(renaming))
+        new_pred.bind(self._pre, self._post)
+        return new_pred
 
     def __str__(self):
         return f"{self.name}({self.argument})"
@@ -407,13 +407,11 @@ class Clause(Formula):
 
     @property
     def free_variables(self) -> Set[Variable]:
-        if self._free_variables: return self._free_variables
         free_local_variables = self.ports.variables | self.guard.variables
         broadcast_variables = set()
         for b in self.broadcasts:
             broadcast_variables |= b.free_variables
-        self._free_variables = free_local_variables | broadcast_variables
-        return self._free_variables
+        return free_local_variables | broadcast_variables
 
     @property
     def local_variables(self) -> List[Variable]:
@@ -421,20 +419,15 @@ class Clause(Formula):
 
     @property
     def predicates(self) -> Set[Predicate]:
-        if self._predicates: return self._predicates
         predicates = set()
         predicates |= self.ports.predicates
         for b in self.broadcasts:
             predicates |= b.body.predicates
-        self._predicates = predicates
-        return self._predicates
+        return predicates
 
     @property
     def sorted_free_variables(self) -> List[Variable]:
-        if self._sorted_free_variables: return self._sorted_free_variables
-        self._sorted_free_variables = [t
-                for t in self.sorted_terms if t in self.free_variables]
-        return self._sorted_free_variables
+        return [t for t in self.sorted_terms if t in self.free_variables]
 
     @property
     def variables(self) -> Set[Variable]:
@@ -442,17 +435,9 @@ class Clause(Formula):
         broadcast_variables = set()
         for b in self.broadcasts:
             broadcast_variables |= b.variables
-        self._variables = local_variables | broadcast_variables
-        return self._variables
+        return local_variables | broadcast_variables
 
     def __post_init__(self):
-        # setup caching
-        self._free_variables = None
-        self._sorted_free_variables = None
-        self._predicates = None
-        self._variables = None
-        self._all_terms = None
-        self._local_terms = None
         # renaming process
         renaming = {v.name: f"x{i}" for i, v in enumerate(self.free_variables)}
         self.guard = self.guard.rename(renaming)
@@ -471,29 +456,18 @@ class Clause(Formula):
                             if (not Unequal(var, v) in conjunct.restrictions
                                 or Unequal(v, var) in conjunct.restrictions)]
                 conjunct.restrictions += disequalities
-        # invalidate caching
-        self._free_variables = None
-        self._sorted_free_variables = None
-        self._predicates = None
-        self._variables = None
-        self._all_terms = None
-        self._local_terms = None
 
     @property
     def all_terms(self) -> Set[Term]:
-        if self._all_terms: return self._all_terms
         terms = self.guard.all_terms | self.ports.all_terms
         for b in self.broadcasts:
             terms |= b.all_terms
-        self._all_terms = terms
-        return self._all_terms
+        return terms
 
     @property
     def local_terms(self) -> List[Term]:
-        if self._local_terms: return self._local_terms
-        self._local_terms = [t for t in self.sorted_terms
-                if t.variables.issubset(self.free_variables) and t.variables]
-        return self._local_terms
+        return [t for t in self.sorted_terms
+                if t.variables.issubset(self.free_variables)]
 
     def __str__(self):
         return f"Clause({self.guard}, {self.ports}, {self.broadcasts})"

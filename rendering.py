@@ -7,7 +7,7 @@ import formula
 import jinja2
 
 env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader('mona-templates/')
+        loader=jinja2.FileSystemLoader('./')
     )
 
 def add_function(jinja_filter):
@@ -174,26 +174,176 @@ def transition_trap_predicate(system: system.System, clause: formula.Clause,
             [], formula).render()
 
 @add_function
-def trap_predicate(system: system.System):
+def trap_predicate(system: system.System) -> str:
     inner = mona.Conjunction([mona.PredicateCall(f"trap_transition_{number}",
         system.states) for number in range(1, len(system.interaction) + 1)])
     return mona.PredicateDefinition("trap", system.states, [], inner).render()
 
 @add_function
-def deadlock_predicate(system: system.System):
+def deadlock_predicate(system: system.System) -> str:
     inner = mona.Conjunction([mona.PredicateCall(f"dead_transition_{number}",
         system.states) for number in range(1, len(system.interaction) + 1)])
     return mona.PredicateDefinition("deadlock", system.states, [],
             inner).render()
 
 @add_function
-def trap_invariant(system: system.System):
+def trap_invariant(system: system.System) -> str:
     trap_states = [mona.Variable(f"T{s}") for s in system.states]
     precondition = mona.Conjunction([mona.PredicateCall("trap", trap_states),
         mona.PredicateCall("intersects_initial", trap_states)])
     postcondition = mona.PredicateCall("intersection",
             trap_states + system.states)
     return mona.UniversalSecondOrder(trap_states,
+            mona.Implication(precondition, postcondition)).render()
+
+def _broadcast_disjoint_all_pre(broadcast: formula.Broadcast) -> mona.Formula:
+    guard = mona.translate_guard_and_terms(broadcast)
+    variables = mona.get_quantifiable_objects(broadcast)
+    inner = mona.Conjunction([_miss_pre(p) for p in broadcast.body.predicates])
+    return mona.UniversalFirstOrder(variables,
+            mona.Implication(guard, inner))
+
+def _broadcast_disjoint_all_post(broadcast: formula.Broadcast) -> mona.Formula:
+    guard = mona.translate_guard_and_terms(broadcast)
+    variables = mona.get_quantifiable_objects(broadcast)
+    inner = mona.Conjunction([_miss_post(p) for p in broadcast.body.predicates])
+    return mona.UniversalFirstOrder(variables,
+            mona.Implication(guard, inner))
+
+def _disjoint_all_broadcasts_pre(clause: formula.Clause) -> mona.Formula:
+    return mona.Conjunction([_broadcast_disjoint_all_pre(b)
+        for b in clause.broadcasts])
+
+def _disjoint_all_broadcasts_post(clause: formula.Clause) -> mona.Formula:
+    return mona.Conjunction([_broadcast_disjoint_all_post(b)
+        for b in clause.broadcasts])
+
+def _disjoint_all_free_pre(clause: formula.Clause) -> mona.Formula:
+    return mona.Conjunction([_miss_pre(p) for p in clause.ports.predicates])
+
+def _disjoint_all_pre(clause: formula.Clause) -> mona.Formula:
+    return mona.Conjunction([_disjoint_all_free_pre(clause),
+        _disjoint_all_broadcasts_pre(clause)])
+
+def _disjoint_all_post(clause: formula.Clause) -> mona.Formula:
+    return mona.Conjunction([_disjoint_all_free_post(clause),
+        _disjoint_all_broadcasts_post(clause)])
+
+def _disjoint_all_free_post(clause: formula.Clause) -> mona.Formula:
+    return mona.Conjunction([_miss_post(p) for p in clause.ports.predicates])
+
+def _one_pre_in_free(clause: formula.Clause) -> mona.Formula:
+    return mona.Disjunction([
+        mona.Conjunction([_hit_pre(p)] + [_miss_pre(o)
+            for o in clause.ports.predicates if o != p])
+        for p in clause.ports.predicates])
+
+def _one_post_in_free(clause: formula.Clause) -> mona.Formula:
+    return mona.Disjunction([
+        mona.Conjunction([_hit_post(p)] + [_miss_post(o)
+            for o in clause.ports.predicates if o != p])
+        for p in clause.ports.predicates])
+
+def _one_pre_in_broadcast(broadcast: formula.Broadcast) -> mona.Formula:
+    y = mona.Variable("y")
+    renamed_broadcast = broadcast.rename({broadcast.variable.name: y.name})
+    pos_variables = mona.get_quantifiable_objects(broadcast)
+    pos_guard = mona.translate_guard_and_terms(broadcast)
+    neg_variables = mona.get_quantifiable_objects(renamed_broadcast)
+    neg_guard = mona.translate_guard_and_terms(renamed_broadcast)
+    inner = mona.UniversalFirstOrder(neg_variables,
+            mona.Implication(mona.Conjunction([neg_guard,
+                mona.Disjunction([_hit_pre(p)
+                for p in renamed_broadcast.body.predicates])]),
+                mona.Equal(y, mona.translate_term(broadcast.variable))))
+    outer = mona.ExistentialFirstOrder(pos_variables,
+            mona.Conjunction([pos_guard] + [_hit_pre(p)
+                for p in broadcast.body.predicates] + [inner]))
+    return outer
+
+def _one_post_in_broadcast(broadcast: formula.Broadcast) -> mona.Formula:
+    y = mona.Variable("y")
+    renamed_broadcast = broadcast.rename({broadcast.variable.name: y.name})
+    pos_variables = mona.get_quantifiable_objects(broadcast)
+    pos_guard = mona.translate_guard_and_terms(broadcast)
+    neg_variables = mona.get_quantifiable_objects(renamed_broadcast)
+    neg_guard = mona.translate_guard_and_terms(renamed_broadcast)
+    inner = mona.UniversalFirstOrder(neg_variables,
+            mona.Implication(mona.Conjunction([neg_guard,
+                mona.Disjunction([_hit_post(p)
+                for p in renamed_broadcast.body.predicates])]),
+                mona.Equal(y, mona.translate_term(broadcast.variable))))
+    outer = mona.ExistentialFirstOrder(pos_variables,
+            mona.Conjunction([pos_guard] + [_hit_post(p)
+                for p in broadcast.body.predicates] + [inner]))
+    return outer
+
+def _one_pre_all_broadcasts(clause: formula.Clause) -> mona.Formula:
+    tmp = mona.Disjunction([
+        mona.Conjunction([_one_pre_in_broadcast(b)]
+            + [_broadcast_disjoint_all_pre(o)
+                for j, o in enumerate(clause.broadcasts) if i != j])
+        for i, b in enumerate(clause.broadcasts)])
+    return tmp
+
+def _one_post_all_broadcasts(clause: formula.Clause) -> mona.Formula:
+    return mona.Disjunction([
+        mona.Conjunction([_one_post_in_broadcast(b)]
+            + [_broadcast_disjoint_all_post(o)
+                for j, o in enumerate(clause.broadcasts) if i != j])
+        for i, b in enumerate(clause.broadcasts)])
+
+def _one_in_pre(clause: formula.Clause) -> mona.Formula:
+    return mona.Disjunction([
+        mona.Conjunction([_one_pre_in_free(clause),
+            _disjoint_all_broadcasts_pre(clause)]),
+        mona.Conjunction([_disjoint_all_free_pre(clause),
+            _one_pre_all_broadcasts(clause)])])
+
+def _one_in_post(clause: formula.Clause) -> mona.Formula:
+    return mona.Disjunction([
+        mona.Conjunction([_one_post_in_free(clause),
+            _disjoint_all_broadcasts_post(clause)]),
+        mona.Conjunction([_disjoint_all_free_post(clause),
+            _one_post_all_broadcasts(clause)])])
+
+@add_function
+def transition_invariant_predicate(system: system.System,
+        clause: formula.Clause, number: int) -> str:
+    inner = mona.Disjunction([
+        # disjoint pre and post
+        mona.Conjunction([_disjoint_all_pre(clause),
+            _disjoint_all_post(clause)]),
+        # unique pre and post
+        mona.Conjunction([_one_in_pre(clause), _one_in_post(clause)]),
+        # more than one in pre
+        mona.Conjunction([mona.Negation(_disjoint_all_pre(clause)),
+            mona.Negation(_one_in_pre(clause))]),
+        ])
+    variables = mona.get_quantifiable_objects(clause)
+    guard = mona.translate_guard_and_terms(clause)
+    quantification = mona.UniversalFirstOrder(variables,
+            mona.Implication(guard, inner))
+    return mona.PredicateDefinition(f"invariant_transition_{number}",
+            system.states, [], quantification).render()
+
+@add_function
+def invariant_predicate(system: system.System) -> str:
+    inner = mona.Conjunction([mona.PredicateCall(
+        f"invariant_transition_{number}", system.states) for number in
+        range(1, len(system.interaction) + 1)])
+    return mona.PredicateDefinition(f"invariant",
+            system.states, [], inner).render()
+
+@add_function
+def flow_invariant(system: system.System) -> str:
+    flow_states = [mona.Variable(f"F{s}") for s in system.states]
+    precondition = mona.Conjunction([mona.PredicateCall("invariant",
+        flow_states),
+        mona.PredicateCall("uniquely_intersects_initial", flow_states)])
+    postcondition = mona.PredicateCall("unique_intersection",
+            flow_states + system.states)
+    return mona.UniversalSecondOrder(flow_states,
             mona.Implication(precondition, postcondition)).render()
 
 def render_base_theory(system: system.System) -> str:

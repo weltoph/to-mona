@@ -5,7 +5,7 @@ Component Task <idle> {
 }
 
 Formula {
-  startExecution(p) broadcasting { o: o ~= p. isIdle(o) };
+  startExecution(p) broadcasting { o: o < p. isIdle(o) } broadcasting { o: o > p. isIdle(o) };
   stopExecution(p);
 }
 

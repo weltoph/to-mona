@@ -1,6 +1,8 @@
 /* size of universe */
 var1 n;
 
+2 <= n;
+
 /* marking variables */
 {% for s in system.states %}
 var2 {{ s }};
@@ -60,6 +62,9 @@ pred is_last(var1 last) = (
 
 /* introduce predicate to describe trap condition of {{ clause }} */
 {{ transition_trap_predicate(system, clause, loop.index) }}
+
+/* introduce predicate to describe flow invariant condition of {{ clause }} */
+{{ transition_invariant_predicate(system, clause, loop.index) }}
 {% endfor %}
 
 /* predicate to describe a deadlock */
@@ -68,5 +73,11 @@ pred is_last(var1 last) = (
 /* predicate to describe a trap */
 {{ trap_predicate(system) }}
 
+/* predicate to describe a flow invariant */
+{{ invariant_predicate(system) }}
+
 /* invariant that every initially marked trap has to be marked by any marking */
 {{ trap_invariant(system) }};
+
+/* invariant that every initially uniquely marked flow has to be marked by precisely one place by any marking */
+{{ flow_invariant(system) }};
