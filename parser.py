@@ -107,17 +107,19 @@ class PredicateParser(Transformer):
 class RestrictionParser(Transformer):
     @v_args(inline=True)
     def comparison(self, left, symbol, right):
-        from formula import Less, LessEqual, Greater, GreaterEqual
-        from formula import Equal, Unequal
-        lookup = {
-                "~=": Unequal,
-                "=" : Equal,
-                "<" : Less,
-                "<=": LessEqual,
-                ">" : Greater,
-                ">=": GreaterEqual,
-                }
-        return lookup[str(symbol)](left, right)
+        from formula import Less, LessEqual, Equal, Unequal
+        if symbol == "~=":
+            return Unequal(left, right)
+        elif symbol == "=":
+            return Equal(left, right)
+        elif symbol == "<":
+            return Less(left, right)
+        elif symbol == "<=":
+            return LessEqual(left, right)
+        elif symbol == ">":
+            return Less(right, left)
+        elif symbol == ">=":
+            return LessEqual(right, left)
 
     @v_args(inline=True)
     def last(self, argument):

@@ -25,7 +25,7 @@ def intersection_predicate(system: system.System) -> str:
     quantified_formula = mona.ExistentialFirstOrder(x,
             mona.Disjunction(in_both_states))
     return mona.PredicateDefinition("intersection", one_states + two_states,
-            [], quantified_formula).render()
+            [], quantified_formula).simplify().render()
 
 @add_function
 def unique_intersection_predicate(system: system.System) -> str:
@@ -58,7 +58,7 @@ def unique_intersection_predicate(system: system.System) -> str:
             mona.Implication(y_in_intersection, mona.Equal(x, y)))
     formula = mona.ExistentialFirstOrder(x, mona.Conjunction([fix_x, unique_x]))
     return mona.PredicateDefinition("unique_intersection",
-        one_states + two_states, [], formula).render()
+        one_states + two_states, [], formula).simplify().render()
 
 @add_function
 def intersects_initial_predicate(system: system.System) -> str:
@@ -69,7 +69,7 @@ def intersects_initial_predicate(system: system.System) -> str:
             [mona.ElementIn(x, init) for init in initial_states])
     formula = mona.ExistentialFirstOrder(x, x_initial)
     return mona.PredicateDefinition("intersects_initial", system.states, [],
-            formula).render()
+            formula).simplify().render()
 
 @add_function
 def uniquely_intersects_initial_predicate(system: system.System) -> str:
@@ -92,7 +92,7 @@ def uniquely_intersects_initial_predicate(system: system.System) -> str:
     formula = mona.ExistentialFirstOrder(x,
             mona.Conjunction([x_in_only_one_initial, x_unique]))
     return mona.PredicateDefinition("uniquely_intersects_initial",
-            system.states, [], formula).render()
+            system.states, [], formula).simplify().render()
 
 
 def _hit_pre(predicate: formula.Predicate):
@@ -133,7 +133,7 @@ def transition_dead_predicate(system: system.System, clause: formula.Clause,
     formula = mona.UniversalFirstOrder(mona.get_quantifiable_objects(clause),
             inner)
     return mona.PredicateDefinition(f"dead_transition_{number}", system.states,
-            [], formula).render()
+            [], formula).simplify().render()
 
 def _broadcast_one_post(broadcast: formula.Broadcast):
     guard = mona.translate_guard_and_terms(broadcast)
@@ -171,20 +171,20 @@ def transition_trap_predicate(system: system.System, clause: formula.Clause,
     formula = mona.UniversalFirstOrder(variables,
             mona.Implication(guard, inner))
     return mona.PredicateDefinition(f"trap_transition_{number}", system.states,
-            [], formula).render()
+            [], formula).simplify().render()
 
 @add_function
 def trap_predicate(system: system.System) -> str:
     inner = mona.Conjunction([mona.PredicateCall(f"trap_transition_{number}",
         system.states) for number in range(1, len(system.interaction) + 1)])
-    return mona.PredicateDefinition("trap", system.states, [], inner).render()
+    return mona.PredicateDefinition("trap", system.states, [], inner).simplify().render()
 
 @add_function
 def deadlock_predicate(system: system.System) -> str:
     inner = mona.Conjunction([mona.PredicateCall(f"dead_transition_{number}",
         system.states) for number in range(1, len(system.interaction) + 1)])
     return mona.PredicateDefinition("deadlock", system.states, [],
-            inner).render()
+            inner).simplify().render()
 
 @add_function
 def trap_invariant(system: system.System) -> str:
@@ -194,7 +194,7 @@ def trap_invariant(system: system.System) -> str:
     postcondition = mona.PredicateCall("intersection",
             trap_states + system.states)
     return mona.UniversalSecondOrder(trap_states,
-            mona.Implication(precondition, postcondition)).render()
+            mona.Implication(precondition, postcondition)).simplify().render()
 
 def _broadcast_disjoint_all_pre(broadcast: formula.Broadcast) -> mona.Formula:
     guard = mona.translate_guard_and_terms(broadcast)
@@ -325,7 +325,7 @@ def transition_invariant_predicate(system: system.System,
     quantification = mona.UniversalFirstOrder(variables,
             mona.Implication(guard, inner))
     return mona.PredicateDefinition(f"invariant_transition_{number}",
-            system.states, [], quantification).render()
+            system.states, [], quantification).simplify().render()
 
 @add_function
 def invariant_predicate(system: system.System) -> str:
@@ -333,7 +333,7 @@ def invariant_predicate(system: system.System) -> str:
         f"invariant_transition_{number}", system.states) for number in
         range(1, len(system.interaction) + 1)])
     return mona.PredicateDefinition(f"invariant",
-            system.states, [], inner).render()
+            system.states, [], inner).simplify().render()
 
 @add_function
 def flow_invariant(system: system.System) -> str:
@@ -344,7 +344,7 @@ def flow_invariant(system: system.System) -> str:
     postcondition = mona.PredicateCall("unique_intersection",
             flow_states + system.states)
     return mona.UniversalSecondOrder(flow_states,
-            mona.Implication(precondition, postcondition)).render()
+            mona.Implication(precondition, postcondition)).simplify().render()
 
 def render_base_theory(system: system.System) -> str:
     template = env.get_template("base-theory.mona")

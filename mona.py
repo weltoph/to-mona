@@ -10,6 +10,15 @@ class Formula(object):
     def render(self) -> str:
         raise NotImplemented
 
+    def _block_indent(self, block: str) -> str:
+        return "\n".join([f"  {l}" for l in block.split("\n")])
+
+    def simplify(self) -> "Formula":
+        return self
+
+    def negate(self) -> "Formula":
+        raise NotImplemented
+
 class Term(object):
     def render(self) -> str:
         raise NotImplemented
@@ -22,22 +31,37 @@ class Variable(Term):
         return self.name
 
 @dataclass
-class Constant(Term):
+class TermConstant(Term):
     value: int
 
     def render(self) -> str:
         return str(self.value)
 
 @dataclass
+class FormulaConstant(Formula):
+    value: bool
+
+    def render(self) -> str:
+        return "true" if self.value else "false"
+
+    def negate(self) -> "FormulaConstant":
+        return FormulaConstant(not self.value)
+
+@dataclass
 class StatementChain(Formula):
     statements: List[Formula]
 
     def render(self) -> str:
-        if not self.statements:
-            return f"( {self.empty_value} )"
-        statements = f" {self.comp_symb} ".join(
-                [s.render() for s in self.statements])
-        return f"( {statements} )"
+        new_lines = []
+        for s in self.statements:
+            lines = s.render().split("\n")
+            statement = [f"\t{l}" for l in lines]
+            new_lines.append(self._block_indent(s.render()))
+        inner = f"\n) {self.comp_symb} (\n".join(new_lines)
+        return f"(\n{inner}\n)"
+
+    def _simplified_statements(self) -> List[Formula]:
+        return [s.simplify() for s in self.statements]
 
 @dataclass
 class Conjunction(StatementChain):
@@ -45,9 +69,28 @@ class Conjunction(StatementChain):
     def comp_symb(self) -> str:
         return "&"
 
-    @property
-    def empty_value(self):
-        return "true"
+    def simplify(self):
+        simplified = [s
+                for s in self._simplified_statements()
+                if not (type(s) is FormulaConstant and s.value)]
+        if not simplified:
+            return FormulaConstant(True)
+        elif any([(type(s) is FormulaConstant and not s.value)
+            for s in simplified]):
+            return FormulaConstant(False)
+        elif len(simplified) == 1:
+                return simplified.pop()
+        else:
+            flatten = []
+            for s in simplified:
+                if type(s) == Conjunction:
+                    flatten += s.statements
+                else:
+                    flatten.append(s)
+            return Conjunction(flatten)
+
+    def negate(self):
+        return Disjunction([s.negate() for s in self.statements])
 
 @dataclass
 class Disjunction(StatementChain):
@@ -55,9 +98,28 @@ class Disjunction(StatementChain):
     def comp_symb(self) -> str:
         return "|"
 
-    @property
-    def empty_value(self):
-        return "false"
+    def simplify(self):
+        simplified = [s
+                for s in self._simplified_statements()
+                if not (type(s) is FormulaConstant and not s.value)]
+        if not simplified:
+            return FormulaConstant(False)
+        elif any([(type(s) is FormulaConstant and s.value)
+            for s in simplified]):
+            return FormulaConstant(True)
+        elif len(simplified) == 1:
+                return simplified.pop()
+        else:
+            flatten = []
+            for s in simplified:
+                if type(s) == Disjunction:
+                    flatten += s.statements
+                else:
+                    flatten.append(s)
+            return Disjunction(flatten)
+
+    def negate(self):
+        return Conjunction([s.negate() for s in self.statements])
 
 @dataclass
 class Implication(Formula):
@@ -65,14 +127,34 @@ class Implication(Formula):
     right: Formula
 
     def render(self) -> str:
-        return f"( ({self.left.render()}) => ({self.right.render()}) )"
+        l = self._block_indent(self.left.render())
+        r = self._block_indent(self.right.render())
+        return f"(\n{l}\n) => (\n{r}\n)"
+
+    def simplify(self):
+        left = self.left.simplify()
+        right = self.right.simplify()
+        if type(left) is TermConstant:
+            return right if left.value else TermConstant(True)
+        elif type(right) is TermConstant:
+            return TermConstant(True) if right.value else left.negate()
+        elif type(right) is Implication:
+            new_left = Conjunction([self.left, self.right.left]).simplify()
+            new_right = self.right.right
+            return Implication(new_left, new_right)
+        else:
+            return Implication(left, right)
 
 @dataclass
 class Negation(Formula):
     inner: Formula
 
     def render(self) -> str:
-        return f"~({self.inner.render()})"
+        i = self._block_indent(self.inner.render())
+        return f"~(\n{i}\n)"
+
+    def simplify(self):
+        return self.inner.negate().simplify()
 
 @dataclass
 class Atom(Formula):
@@ -90,7 +172,7 @@ class Comparison(Atom):
                 else self.right)
 
     def render(self) -> str:
-        return f"({self.left.render()} {self.comp_symb} {self.right.render()})"
+        return f"{self.left.render()} {self.comp_symb} {self.right.render()}"
 
 @dataclass
 class Unequal(Comparison):
@@ -98,11 +180,17 @@ class Unequal(Comparison):
     def comp_symb(self) -> str:
         return "~="
 
+    def negate(self):
+        return Equal(self.left, self.right)
+
 @dataclass
 class Equal(Comparison):
     @property
     def comp_symb(self) -> str:
         return "="
+
+    def negate(self):
+        return Unequal(self.left, self.right)
 
 @dataclass
 class Less(Comparison):
@@ -110,24 +198,17 @@ class Less(Comparison):
     def comp_symb(self) -> str:
         return "<"
 
+    def negate(self):
+        return LessEqual(self.right, self.left)
+
 @dataclass
 class LessEqual(Comparison):
     @property
     def comp_symb(self) -> str:
         return "<="
 
-@dataclass
-class Greater(Comparison):
-    @property
-    def comp_symb(self) -> str:
-        return ">"
-
-@dataclass
-class GreaterEqual(Comparison):
-    @property
-    def comp_symb(self) -> str:
-        return ">="
-
+    def negate(self):
+        return Less(self.right, self.left)
 
 
 @dataclass
@@ -153,11 +234,17 @@ class ElementIn(Participation):
     def part_symb(self) -> str:
         return "in"
 
+    def negate(self):
+        return ElementNotIn(self.first_order, self.second_order)
+
 @dataclass
 class ElementNotIn(Participation):
     @property
     def part_symb(self) -> str:
         return "notin"
+
+    def negate(self):
+        return ElementIn(self.first_order, self.second_order)
 
 @dataclass
 class PredicateCall(Atom):
@@ -175,6 +262,9 @@ class PredicateCall(Atom):
         variables = ", ".join([v.render() for v in self.variables])
         return f"{self.name}({variables})"
 
+    def negate(self):
+        return Negation(self)
+
 @dataclass
 class Quantification(Formula):
     variables: Union[List[Union[Variable, str]], Union[Variable, str]]
@@ -188,67 +278,73 @@ class Quantification(Formula):
                 for v in self.variables]
 
     def render(self) -> str:
-        if not self.variables:
-            return f"( {self.render_inner()} )"
-        variables = ", ".join([v.render() for v in self.variables])
-        quantification = f"{self.kind}{self.order} {variables}"
-        return f"{quantification}: ( {self.render_inner()} )"
+        inner = self._block_indent(self._actual_inner().render())
+        variables = ", ".join([v.name for v in self.variables])
+        return f"{self.kind} {variables}: (\n{inner}\n)"
 
-    def render_inner(self) -> str:
-        return self.inner.render()
+    def _actual_inner(self):
+        return self.inner
+
+    def simplify(self):
+        inner = self.inner.simplify()
+        if not self.variables:
+            return inner
+        else:
+            return type(self)(self.variables, inner)
+
+@dataclass
+class GuardedFirstOrderQuantification(Quantification):
+    def __post_init__(self):
+        super().__post_init__()
+        n = Variable("n")
+        zero = TermConstant(0)
+        self.guard = Conjunction([
+                LessEqual(zero, v) for v in self.variables
+            ] + [
+                Less(v, n) for v in self.variables
+            ])
 
 @dataclass
 class ExistentialSecondOrder(Quantification):
-    @property
-    def kind(self) -> str:
-        return "ex"
+    def __post_init__(self):
+        super().__post_init__()
+        self.kind = "ex2"
 
-    @property
-    def order(self) -> str:
-        return "2"
+    def negate(self):
+        return UniversalSecondOrder(self.variables, self.inner.negate())
 
 @dataclass
-class ExistentialFirstOrder(Quantification):
-    @property
-    def kind(self) -> str:
-        return "ex"
+class ExistentialFirstOrder(GuardedFirstOrderQuantification):
+    def __post_init__(self):
+        super().__post_init__()
+        self.kind = "ex1"
 
-    @property
-    def order(self) -> str:
-        return "1"
+    def _actual_inner(self):
+        return Conjunction([self.guard, self.inner]).simplify()
 
-    def render_inner(self) -> str:
-        guards = Conjunction([LessEqual(Constant(0), v)
-            for v in self.variables] + [Less(v, "n") for v in self.variables])
-        return f"({guards.render()}) & ({self.inner.render()})"
+    def negate(self):
+        return UniversalFirstOrder(self.variables, self.inner.negate())
 
 @dataclass
 class UniversalSecondOrder(Quantification):
-    @property
-    def kind(self) -> str:
-        return "all"
+    def __post_init__(self):
+        super().__post_init__()
+        self.kind = "all2"
 
-    @property
-    def order(self) -> str:
-        return "2"
+    def negate(self):
+        return ExistentialSecondOrder(self.variables, self.inner.negate())
 
 @dataclass
-class UniversalFirstOrder(Quantification):
-    @property
-    def kind(self) -> str:
-        return "all"
+class UniversalFirstOrder(GuardedFirstOrderQuantification):
+    def __post_init__(self):
+        super().__post_init__()
+        self.kind = "all1"
 
-    @property
-    def order(self) -> str:
-        return "1"
+    def _actual_inner(self):
+        return Implication(self.guard, self.inner).simplify()
 
-    def render_inner(self) -> str:
-        guards = Conjunction([LessEqual(Constant(0), v)
-            for v in self.variables] + [Less(v, "n") for v in self.variables])
-        if guards:
-            return f"({guards.render()}) => ({self.inner.render()})"
-        else:
-            return f"({self.inner.render()})"
+    def negate(self):
+        return ExistentialFirstOrder(self.variables, self.inner.negate())
 
 @dataclass
 class PredicateDefinition(Formula):
@@ -265,19 +361,20 @@ class PredicateDefinition(Formula):
                 (Variable(v) if type(v) is str else v)
                 for v in self.first_order]
 
-    @property
-    def variable_list(self) -> str:
-        return ", ".join([f"var2 {v.render()}" for v in self.second_order]
-                + [f"var1 {v.render()}" for v in self.first_order])
-
     def render(self) -> str:
-        return (f"pred {self.name}({self.variable_list}) = (\n"
-                + f"{self.inner.render()}\n"
-                + f");")
+        inner = self._block_indent(self.inner.render())
+        variable_list = ", ".join([f"var2 {v.render()}" for v in self.second_order]
+                + [f"var1 {v.render()}" for v in self.first_order])
+        return f"pred {self.name}({variable_list}) = (\n{inner}\n);"
+
+    def simplify(self):
+        inner = self.inner.simplify()
+        return PredicateDefinition(self.name, self.second_order,
+                self.first_order, inner)
 
 def translate_term(term: formula.Term) -> Term:
     if type(term) is formula.Constant:
-        return Constant(term.value)
+        return TermConstant(term.value)
     elif type(term) is formula.Variable:
         return Variable(term.name)
     elif type(term) is formula.Successor:
