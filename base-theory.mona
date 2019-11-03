@@ -81,3 +81,13 @@ pred is_last(var1 last) = (
 
 /* invariant that every initially uniquely marked flow has to be marked by precisely one place by any marking */
 {{ flow_invariant(system) }};
+
+{% for name, assumption in system.assumptions.items() %}
+/* custom assumption {{ name }} */
+{{ assumption }};
+{% endfor %}
+
+{% for name, formula in system.properties.items() %}
+/* custom property */
+{{ render_property(system, name, formula) }}
+{% endfor %}

@@ -346,6 +346,11 @@ def flow_invariant(system: system.System) -> str:
     return mona.UniversalSecondOrder(flow_states,
             mona.Implication(precondition, postcondition)).simplify().render()
 
+@add_function
+def render_property(system: system.System, name: str, formula: str) -> str:
+    return mona.PredicateDefinition(name, system.states, [],
+            mona.RawFormula(formula)).simplify().render()
+
 def render_base_theory(system: system.System) -> str:
     template = env.get_template("base-theory.mona")
     return template.render(system=system)

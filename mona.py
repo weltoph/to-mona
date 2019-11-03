@@ -8,7 +8,7 @@ class MonaError(Exception):
 
 class Formula(object):
     def render(self) -> str:
-        raise NotImplemented
+        raise NotImplementedError()
 
     def _block_indent(self, block: str) -> str:
         return "\n".join([f"  {l}" for l in block.split("\n")])
@@ -17,11 +17,21 @@ class Formula(object):
         return self
 
     def negate(self) -> "Formula":
-        raise NotImplemented
+        raise NotImplementedError(f"{type(self)} does not implement negate")
+
+@dataclass
+class RawFormula(Formula):
+    formula: str
+
+    def render(self) -> str:
+        return self.formula
+
+    def negate(self) -> "Formula":
+        return Negation(self)
 
 class Term(object):
     def render(self) -> str:
-        raise NotImplemented
+        raise NotImplementedError()
 
 @dataclass
 class Variable(Term):
@@ -139,11 +149,14 @@ class Implication(Formula):
         elif type(right) is TermConstant:
             return TermConstant(True) if right.value else left.negate()
         elif type(right) is Implication:
-            new_left = Conjunction([self.left, self.right.left]).simplify()
-            new_right = self.right.right
+            new_left = Conjunction([left, right.left]).simplify()
+            new_right = right.right.simplify()
             return Implication(new_left, new_right)
         else:
             return Implication(left, right)
+
+    def negate(self):
+        return Implication(self.right.negate(), self.left.negate())
 
 @dataclass
 class Negation(Formula):
@@ -155,6 +168,9 @@ class Negation(Formula):
 
     def simplify(self):
         return self.inner.negate().simplify()
+
+    def negate(self):
+        return self.inner
 
 @dataclass
 class Atom(Formula):
