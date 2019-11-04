@@ -1,0 +1,57 @@
+Component Cell <invalid> {
+  invalid   -> shareInvalid        -> shared
+  dirty     -> shareDirty          -> shared
+  exclusive -> shareExclusive      -> shared
+
+  dirty     -> invalidateDirty     -> invalid
+  exclusive -> invalidateExclusive -> invalid
+  shared    -> invalidateShared    -> invalid
+
+  invalid   -> isInvalid           -> invalid
+  shared    -> isShared            -> shared
+  exclusive -> isExclusive         -> exclusive
+  dirty     -> isDirty             -> dirty
+
+  exclusive -> taintExclusive      -> dirty
+  shared    -> taintShared         -> dirty
+  invalid   -> taintInvalid        -> dirty
+
+  invalid   -> exclusifyInvalid    -> exclusive
+}
+
+Formula {
+  # read miss
+  exclusifyInvalid(i) broadcasting { o: o ~= i. isInvalid(o) };
+  i ~= j. shareInvalid(i) & shareDirty(j);
+  i ~= j. shareInvalid(i) & isShared(j) broadcasting { o: o ~= i & o ~= j.
+                                                          isInvalid(o)
+                                                        | shareExclusive(o)
+                                                        | isShared(o)
+                                                        | isDirty(o) };
+
+  i ~= j. shareInvalid(i) & shareExclusive(j) broadcasting {o: o ~= i & o ~= j.
+                                                               isInvalid(o)
+                                                             | shareExclusive(o)
+                                                             | isShared(o)
+                                                             | isDirty(o) };
+  # write hit
+  taintExclusive(i);
+  taintShared(i) broadcasting {o: o ~= i. isDirty(o)
+                                        | isExclusive(o)
+                                        | invalidateShared(o)
+                                        | isInvalid(o) };
+  # write miss
+  taintInvalid(i) broadcasting {o: o ~= i. invalidateDirty(o)
+                                         | invalidateExclusive(o)
+                                         | invalidateShared(o)
+                                         | isInvalid(o) };
+
+  # replacemen
+  invalidateDirty(i);
+  invalidateShared(i);
+  invalidateExclusive(i);
+}
+
+property "nosafety" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & ((i in dirty & j in dirty) | (i in dirty & j in shared))"
+}

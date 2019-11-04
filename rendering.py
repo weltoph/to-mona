@@ -351,7 +351,11 @@ def render_property(system: system.System, name: str, formula: str) -> str:
     return mona.PredicateDefinition(name, system.states, [],
             mona.RawFormula(formula)).simplify().render()
 
-def render_base_theory(system: system.System) -> str:
-    template = env.get_template("base-theory.mona")
-    return template.render(system=system)
+@add_function
+def render_property_check(system: system.System, property_name: str) -> str:
+    return mona.PredicateCall(property_name, system.states).render()
 
+def render_property_unreachability(system: system.System,
+        property_name: str) -> str:
+    template = env.get_template("proof-script.mona")
+    return template.render(system=system, property_name=property_name)

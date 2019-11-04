@@ -1,5 +1,4 @@
 from lark import Lark, Transformer, v_args
-from rendering import render_base_theory
 
 class ParserError(Exception):
     pass
@@ -222,21 +221,13 @@ class SystemParser(Transformer):
                 {name: value for kind, name, value in additions
                     if kind == SystemAddition.PROPERTY})
 
-
-if __name__ == "__main__":
-    import sys
-    files = [filename for filename in sys.argv[1:] if filename.endswith(".sys")]
-    for filename in files:
-        try:
-            print(filename)
-            with open(filename, "r") as f:
-                text = f.read()
-                transformer = (TermParser() * PredicateParser()
-                        * RestrictionParser() * GuardParser()
-                        * BroadcastParser() * ClauseParser()
-                        * ComponentParser() * PropertyParser()
-                        * SystemParser())
-                system = transformer.transform(parser.parse(text))
-                print(render_base_theory(system))
-        except IsADirectoryError:
-            continue
+def parse_file(filename):
+    with open(filename, "r") as f:
+        text = f.read()
+        transformer = (TermParser() * PredicateParser()
+                * RestrictionParser() * GuardParser()
+                * BroadcastParser() * ClauseParser()
+                * ComponentParser() * PropertyParser()
+                * SystemParser())
+        system = transformer.transform(parser.parse(text))
+        return system

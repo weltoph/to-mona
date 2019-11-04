@@ -3,6 +3,7 @@ Component Element <A> {
   B -> second -> C
   C -> third  -> D
   D -> fourth -> A
+
   A -> isA    -> A
   B -> isB    -> B
   C -> isC    -> C

@@ -77,6 +77,10 @@ class System:
     assumptions: Dict[str, str]
     properties: Dict[str, str]
 
+    @property
+    def property_names(self) -> List[str]:
+        return sorted(list(self.properties.keys()) + ["deadlock"])
+
     def __post_init__(self):
         self.components_of_labels = {
                 l: c for c in self.components
@@ -93,7 +97,6 @@ class System:
                     raise SystemDefinitionError(
                             f"{predicate.name} unknown in system")
                 predicate.bind(*edge)
-
 
     @property
     def states(self) -> Set[str]:

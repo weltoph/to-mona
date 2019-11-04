@@ -413,7 +413,7 @@ def successor_constraint(succ: formula.Successor) -> PredicateCall:
 
 def translate_formula(f: formula.Formula) -> Formula:
     if type(f) is formula.Last:
-        argument = translate_term(formula.argument)
+        argument = translate_term(f.argument)
         return PredicateCall("is_last", argument)
     elif type(f) is formula.Less:
         left = translate_term(f.left)
@@ -458,3 +458,19 @@ def get_quantifiable_objects(statement:
     considered_terms = ([t for t in statement.local_terms if (not t.is_atomic)]
             + statement.local_variables)
     return [translate_term(t) for t in considered_terms]
+
+
+def call_mona(scriptfile: str) -> str:
+    from subprocess import run
+    result = run(f"mona -q {scriptfile}",
+            capture_output=True, shell=True, encoding="utf-8")
+    if result.returncode != 0:
+        msg = f"error executing {result.args}:\n{result.stdout}"
+        raise MonaError(msg)
+    return result.stdout
+
+def write_tmp_file(content: str) -> str:
+    from tempfile import NamedTemporaryFile
+    with NamedTemporaryFile(mode = "w", delete = False) as tmp_file:
+        print(content, file=tmp_file, flush=True)
+        return tmp_file.name

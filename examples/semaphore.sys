@@ -9,10 +9,10 @@ Component Semaphore <free> {
 }
 
 Formula {
-  start(p) & aquire(root);
-  stop(p)  & release(root);
+  start(p) & aquire(0);
+  stop(p)  & release(0);
 }
 
 property "nomutex" {
-  "ex1 i, j: i in U & j in U & i ~= j & i in critical & j in critical"
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in critical & j in critical"
 }

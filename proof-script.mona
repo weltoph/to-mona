@@ -40,7 +40,7 @@ pred is_next(var1 first_index, var1 succ_first_index) = (
 
 /* check if an element is the last index */
 pred is_last(var1 last) = (
-  last = n
+  last + 1 = n
 );
 
 /* define an intersection between two sets */
@@ -91,3 +91,5 @@ pred is_last(var1 last) = (
 /* custom property */
 {{ render_property(system, name, formula) }}
 {% endfor %}
+
+{{ render_property_check(system, property_name) }};

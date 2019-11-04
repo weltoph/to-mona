@@ -16,5 +16,5 @@ Formula {
 }
 
 property "nomutex" {
-  "ex1 i, j: i in U & j in U & i ~= j & i in executing & j in executing"
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in executing & j in executing"
 }

@@ -14,7 +14,3 @@ Formula {
                 grabRight(p) & grabbed(1);
   released(0) & dropBoth(p)  & released(1);
 }
-
-assumption "linear" {
-  "all1 x: x in U => last1(x)"
-}
