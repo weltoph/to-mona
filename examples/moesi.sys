@@ -1,0 +1,60 @@
+Component Cell <invalid> {
+  invalid   -> shareInvalid        -> shared
+  modified  -> shareModified       -> shared
+  exclusive -> shareExclusive      -> shared
+  owned     -> shareOwned          -> shared
+  shared    -> shareShared         -> shared
+
+  modified  -> ownModified         -> owned
+  owned     -> ownOwned            -> owned
+
+  modified  -> invalidateModified  -> invalid
+  exclusive -> invalidateExclusive -> invalid
+  shared    -> invalidateShared    -> invalid
+  invalid   -> invalidateInvalid   -> invalid
+  owned     -> invalidateOwned     -> invalid
+
+  exclusive -> modifyExclusive     -> modified
+
+  shared    -> exclusifyShared     -> exclusive
+  owned     -> exclusifyOwned      -> exclusive
+  invalid   -> exclusifyInvalid    -> exclusive
+}
+
+Formula {
+  # read miss
+  shareInvalid(i) broadcasting { o: o ~= i. shareShared(o)
+                                          | invalidateInvalid(o)
+                                          | shareExclusive(o)
+                                          | ownOwned(o)
+                                          | ownModified(o) };
+  # write hit
+  modifyExclusive(i);
+  exclusifyShared(i) broadcasting { o: o ~= i. invalidateModified(o)
+                                             | invalidateExclusive(o)
+                                             | invalidateShared(o)
+                                             | invalidateInvalid(o)
+                                             | invalidateOwned(o) };
+
+  exclusifyOwned(i) broadcasting { o: o ~= i. invalidateModified(o)
+                                            | invalidateExclusive(o)
+                                            | invalidateShared(o)
+                                            | invalidateInvalid(o)
+                                            | invalidateOwned(o) };
+  # write miss
+  exclusifyInvalid(i) broadcasting { o: o ~= i. invalidateModified(o)
+                                              | invalidateExclusive(o)
+                                              | invalidateShared(o)
+                                              | invalidateInvalid(o)
+                                              | invalidateOwned(o) };
+
+  # replacement
+  invalidateModified(i);
+  invalidateExclusive(i);
+  invalidateShared(i);
+  invalidateOwned(i);
+}
+
+property "nosafety" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & ( (i in modified & j in modified) | (i in exclusive & j in exclusive) | ((i in shared | i in owned) & j in exclusive) | ((i in exclusive | i in owned | i in shared) & j in modified))"
+}

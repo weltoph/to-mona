@@ -38,7 +38,7 @@ Formula {
 }
 
 property "nomutex" {
-  "ex1 i, j: i in U & j in U & i ~= j & i in pc6 & j in pc6"
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & 0 < n & i ~= j & i in pc6 & j in pc6"
 }
 
 assumption "participants" {

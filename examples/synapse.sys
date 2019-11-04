@@ -1,0 +1,27 @@
+Component Cell <invalid> {
+  invalid -> readMiss -> valid
+  invalid -> invalidateInvalid -> invalid
+  dirty -> invalidateDirty -> invalid
+  valid -> invalidateValid -> invalid
+  valid -> writeHit -> dirty
+  invalid -> writeMiss -> dirty
+}
+
+
+Formula {
+  readMiss(i) broadcasting {o: o ~= i. invalidateInvalid(o)
+                                     | invalidateDirty(o) };
+  writeHit(i) broadcasting {o: o ~= i. invalidateInvalid(o)
+                                     | invalidateDirty(o)
+                                     | invalidateValid(o) };
+
+  writeMiss(i) broadcasting {o: o ~= i. invalidateInvalid(o)
+                                      | invalidateDirty(o)
+                                      | invalidateValid(o) };
+  invalidateDirty(i);
+  invalidateValid(i);
+}
+
+property "nosafety" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & ((i in dirty & j in dirty) | (i in dirty & j in valid))"
+}

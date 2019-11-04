@@ -156,7 +156,7 @@ class Implication(Formula):
             return Implication(left, right)
 
     def negate(self):
-        return Implication(self.right.negate(), self.left.negate())
+        return Conjunction([self.left, Negation(self.right)])
 
 @dataclass
 class Negation(Formula):
