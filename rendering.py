@@ -157,17 +157,25 @@ def transition_trap_predicate(system: system.System, clause: formula.Clause,
         number: int) -> str:
     guard = mona.translate_guard_and_terms(clause)
     variables = mona.get_quantifiable_objects(clause)
-    trap_in_free = mona.Implication(
-            mona.Disjunction([_hit_pre(p)  for p in clause.ports.predicates]),
-            mona.Disjunction([_hit_post(p) for p in clause.ports.predicates]))
-    inner = trap_in_free
+    ports = clause.ports.predicates
+    free_pre = mona.Disjunction([_hit_pre(p) for p in ports])
+    free_post = mona.Disjunction([_hit_post(p) for p in ports])
+    safe_post = [free_post]
+
+    broadcast_local = []
     if clause.broadcasts:
         broadcasts_one_post = mona.Disjunction([_broadcast_one_post(b)
             for b in clause.broadcasts])
-        broadcasts_vertical = mona.Conjunction([_broadcast_vertical(b)
-            for b in clause.broadcasts])
-        inner = mona.Disjunction(
-            [trap_in_free, broadcasts_one_post, broadcasts_vertical])
+        safe_post.append(broadcasts_one_post)
+
+        broadcasts_vertical = mona.Conjunction([mona.Negation(free_pre)] +
+                [_broadcast_vertical(b) for b in clause.broadcasts])
+        broadcast_local.append(broadcasts_vertical)
+    inner = mona.Disjunction([
+        mona.Disjunction(safe_post),
+        mona.Conjunction([mona.Negation(free_pre),
+            mona.Conjunction(broadcast_local)])
+        ])
     formula = mona.UniversalFirstOrder(variables,
             mona.Implication(guard, inner))
     return mona.PredicateDefinition(f"trap_transition_{number}", system.states,

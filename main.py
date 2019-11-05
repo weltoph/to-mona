@@ -46,5 +46,5 @@ for filename in args.file:
                     print(f"{filename}: Unreachability of {property_name}" +
                     " could be proven")
             else:
-                print(f"{filename}: Unreachability of {property_name} in could"
+                print(f"{filename}: Unreachability of {property_name} could"
                         + " not be proven")

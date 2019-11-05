@@ -1,9 +1,10 @@
-Component bit
-initial off;
-off -> tick -> on;
-on -> tock -> off;
-off -> isOff -> off;
+Component bit <off> {
+  off -> tick  -> on
+  on  -> tock  -> off
+  off -> isOff -> off
+}
 
-Formula
-ex p: true. tick(p) with all o: p < o. isOff(o);
-ex p, q: p < q. tock(q) & isOff(p);
+Formula {
+  tick(p) broadcasting { o: p < o. isOff(o) };
+  p < q. tock(q) & isOff(p);
+}

@@ -52,6 +52,10 @@ Formula {
   invalidateExclusive(i);
 }
 
-property "nosafety" {
-  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & ((i in dirty & j in dirty) | (i in dirty & j in shared))"
+property "dirtydirty" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & (i in dirty & j in dirty)"
+}
+
+property "dirtyshared" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & (i in dirty & j in shared)"
 }
