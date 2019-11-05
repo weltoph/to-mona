@@ -1,3 +1,4 @@
+# adapted from: https://person.dibris.unige.it/delzanno-giorgio/CacheProtocol/moesi.hy
 Component Cell <invalid> {
   invalid   -> shareInvalid        -> shared
   modified  -> shareModified       -> shared
@@ -55,6 +56,30 @@ Formula {
   invalidateOwned(i);
 }
 
-property "nosafety" {
-  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & ( (i in modified & j in modified) | (i in exclusive & j in exclusive) | ((i in shared | i in owned) & j in exclusive) | ((i in exclusive | i in owned | i in shared) & j in modified))"
+property "modifiedmodified" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & (i in modified & j in modified)"
+}
+
+property "exclusiveexclusive" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & (i in exclusive & j in exclusive)"
+}
+
+property "sharedexclusive" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & (i in shared & j in exclusive)"
+}
+
+property "ownedexclusive" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & (i in owned & j in exclusive)"
+}
+
+property "exclusivemodified" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & (i in exclusive & j in modified)"
+}
+
+property "ownedmodified" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & (i in owned & j in modified)"
+}
+
+property "sharedmodified" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & (i in shared & j in modified)"
 }

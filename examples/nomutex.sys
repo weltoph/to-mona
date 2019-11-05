@@ -1,0 +1,13 @@
+Component agent <init> {
+  init -> go -> crit
+  crit -> og -> init
+}
+
+Formula {
+  go(p);
+  og(p);
+}
+
+property "mutex" {
+  "ex1 i, j : 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in crit & j in crit"
+}

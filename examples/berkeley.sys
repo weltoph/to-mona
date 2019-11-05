@@ -1,0 +1,60 @@
+# adapted from: https://person.dibris.unige.it/delzanno-giorgio/CacheProtocol/berkeley.hy
+Component Cell <invalid> {
+  invalid      -> isInvalid      -> invalid
+  unowned      -> isUnowned      -> unowned
+  exclusive    -> isExclusive    -> exclusive
+  nonexclusive -> isNonexclusive -> nonexclusive
+
+  exclusive -> shareExclusive -> nonexclusive
+
+  invalid -> disownInvalid -> unowned
+
+  unowned      -> invalidateUnowned      -> invalid
+  exclusive    -> invalidateExclusive    -> invalid
+  nonexclusive -> invalidateNonexclusive -> invalid
+
+  nonexclusive -> exclusifyNonexclusive -> exclusive
+  unowned      -> exclusifyUnowned      -> exclusive
+  invalid      -> exclusifyInvalid      -> exclusive
+}
+
+Formula {
+  # read miss
+  disownInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
+                                           | isUnowned(o)
+                                           | isNonexclusive(o)
+                                           | shareExclusive(o) };
+
+  # write hit
+  exclusifyNonexclusive(i) broadcasting { o: o ~= i. isExclusive(o)
+                                                   | isInvalid(o)
+                                                   | invalidateUnowned(o)
+                                                   | invalidateNonexclusive(o) };
+
+  exclusifyUnowned(i) broadcasting { o: o ~= i. isExclusive(o)
+                                              | isInvalid(o)
+                                              | invalidateUnowned(o)
+                                              | invalidateNonexclusive(o) };
+  # write miss
+  exclusifyInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
+                                              | invalidateUnowned(o)
+                                              | invalidateExclusive(o)
+                                              | invalidateNonexclusive(o) };
+
+  # replacement
+  invalidateUnowned(i);
+  invalidateExclusive(i);
+  invalidateNonexclusive(i);
+}
+
+property "exclusiveexclusive" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in exclusive & j in exclusive"
+}
+
+property "exclusiveunowned" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in exclusive & j in unowned"
+}
+
+property "exclusivenonexclusive" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in exclusive & j in nonexclusive"
+}

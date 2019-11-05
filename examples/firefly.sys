@@ -1,0 +1,75 @@
+# adapted from https://person.dibris.unige.it/delzanno-giorgio/CacheProtocol/firefly.hy
+
+Component Cell <invalid> {
+  invalid   -> isInvalid   -> invalid
+  dirty     -> isDirty     -> dirty
+  exclusive -> isExclusive -> exclusive
+  shared    -> isShared    -> shared
+
+  invalid -> exclusifyInvalid -> exclusive
+  shared  -> exclusifyShared  -> exclusive
+
+  invalid   -> shareInvalid   -> shared
+  dirty     -> shareDirty     -> shared
+  exclusive -> shareExclusive -> shared
+
+  shared    -> invalidateShared    -> invalid
+  dirty     -> invalidateDirty     -> invalid
+  exclusive -> invalidateExclusive -> invalid
+
+  exclusive -> taintExclusive -> dirty
+  invalid   -> taintInvalid   -> dirty
+}
+
+Formula {
+  # read miss
+  exclusifyInvalid(i) broadcasting { o: o ~= i. isInvalid(o) };
+
+  i ~= j. shareInvalid(i) & shareDirty(j);
+
+  i ~= j. shareInvalid(i) & isShared(j) broadcasting { o: o ~= i & o ~= j.
+    isShared(o) | isDirty(o) | isInvalid(o) | shareExclusive(o) };
+
+  i ~= j. shareInvalid(i) & shareExclusive(o) broadcasting { o:
+    o ~= i & o ~= j.
+    isShared(o) | isDirty(o) | isInvalid(o) | shareExclusive(o) };
+
+  # write hit
+  taintExclusive(i);
+
+  exclusifyShared(i) broadcasting { o: o ~= i.
+    isDirty(o) | isInvalid(o) | isExclusive(o) };
+
+  # write miss
+  taintInvalid(i) broadcasting { o: o ~= i.  isInvalid(o) };
+
+  i ~= j. shareInvalid(i) & shareDirty(j);
+
+  i ~= j. shareInvalid(i) & isShared(j) broadcasting { o: o ~= i & o ~= j.
+    isShared(o) | isDirty(o) | isInvalid(o) | shareExclusive(o) };
+
+  i ~= j. shareInvalid(i) & shareExclusive(o) broadcasting { o:
+    o ~= i & o ~= j.
+    isShared(o) | isDirty(o) | isInvalid(o) | shareExclusive(o) };
+
+  # replacement
+  invalidateDirty(i);
+  invalidateExclusive(i);
+  invalidateShared(i);
+}
+
+property "dirtydirty" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in dirty & j in dirty"
+}
+
+property "exclusiveexclusive" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in exclusive & j in exclusive"
+}
+
+property "dirtyshared" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in dirty & j in shared"
+}
+
+property "dirtyexclusive" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in dirty & j in exclusive"
+}

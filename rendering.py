@@ -286,6 +286,28 @@ def _one_post_in_broadcast(broadcast: formula.Broadcast) -> mona.Formula:
                 for p in broadcast.body.predicates] + [inner]))
     return outer
 
+def _vertical_invariant_in_broadcast(broadcast: formula.Broadcast) -> mona.Formula:
+    y = mona.Variable("y")
+    renamed_broadcast = broadcast.rename({broadcast.variable.name: y.name})
+    pos_variables = mona.get_quantifiable_objects(broadcast)
+    pos_guard = mona.translate_guard_and_terms(broadcast)
+    neg_variables = mona.get_quantifiable_objects(renamed_broadcast)
+    neg_guard = mona.translate_guard_and_terms(renamed_broadcast)
+    others_empty = mona.UniversalFirstOrder(neg_variables,
+            mona.Implication(mona.Conjunction([neg_guard,
+                mona.Unequal(y, mona.translate_term(broadcast.variable))]),
+                mona.Conjunction([_miss_post(p)
+                for p in renamed_broadcast.body.predicates]
+                + [_miss_pre(p) for p in renamed_broadcast.body.predicates])))
+    chosen_vertical = mona.Conjunction([
+        mona.Conjunction([
+            mona.Implication(_hit_pre(p), _hit_post(p)),
+            mona.Implication(_hit_post(p), _hit_pre(p))])
+        for p in broadcast.body.predicates])
+    outer = mona.ExistentialFirstOrder(pos_variables,
+            mona.Conjunction([pos_guard, chosen_vertical, others_empty]))
+    return outer
+
 def _one_pre_all_broadcasts(clause: formula.Clause) -> mona.Formula:
     tmp = mona.Disjunction([
         mona.Conjunction([_one_pre_in_broadcast(b)]
@@ -315,6 +337,15 @@ def _one_in_post(clause: formula.Clause) -> mona.Formula:
         mona.Conjunction([_disjoint_all_free_post(clause),
             _one_post_all_broadcasts(clause)])])
 
+def _vertical_in_one_broadcast(clause: formula.Clause) -> mona.Formula:
+    return mona.Disjunction([
+        mona.Conjunction([_vertical_invariant_in_broadcast(b)] +
+            [_broadcast_disjoint_all_pre(o)
+                for j, o in enumerate(clause.broadcasts) if i != j] +
+            [_broadcast_disjoint_all_post(o)
+                for j, o in enumerate(clause.broadcasts) if i != j])
+        for i, b in enumerate(clause.broadcasts)])
+
 @add_function
 def transition_invariant_predicate(system: system.System,
         clause: formula.Clause, number: int) -> str:
@@ -327,6 +358,12 @@ def transition_invariant_predicate(system: system.System,
         # more than one in pre
         mona.Conjunction([mona.Negation(_disjoint_all_pre(clause)),
             mona.Negation(_one_in_pre(clause))]),
+        # one broadcast with vertical allignment (should actually supersede
+        ## disjoint pre and post
+        # mona.Conjunction([_disjoint_all_free_pre(clause),
+        #     _disjoint_all_free_post(clause),
+        #     _vertical_in_one_broadcast(clause)
+        #     ])
         ])
     variables = mona.get_quantifiable_objects(clause)
     guard = mona.translate_guard_and_terms(clause)
