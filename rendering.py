@@ -1,4 +1,5 @@
 from functools import wraps
+from typing import List, Optional, Union
 
 import mona
 import system
@@ -195,14 +196,16 @@ def deadlock_predicate(system: system.System) -> str:
             inner).simplify().render()
 
 @add_function
-def trap_invariant(system: system.System) -> str:
+def trap_invariant_predicate(system: system.System) -> str:
     trap_states = [mona.Variable(f"T{s}") for s in system.states]
     precondition = mona.Conjunction([mona.PredicateCall("trap", trap_states),
         mona.PredicateCall("intersects_initial", trap_states)])
     postcondition = mona.PredicateCall("intersection",
             trap_states + system.states)
-    return mona.UniversalSecondOrder(trap_states,
-            mona.Implication(precondition, postcondition)).simplify().render()
+    return mona.PredicateDefinition("trap_invariant", system.states, [],
+            mona.UniversalSecondOrder(trap_states,
+                mona.Implication(precondition, postcondition))
+            ).simplify().render()
 
 def _broadcast_disjoint_all_pre(broadcast: formula.Broadcast) -> mona.Formula:
     guard = mona.translate_guard_and_terms(broadcast)
@@ -381,15 +384,37 @@ def invariant_predicate(system: system.System) -> str:
             system.states, [], inner).simplify().render()
 
 @add_function
-def flow_invariant(system: system.System) -> str:
+def flow_invariant_predicate(system: system.System) -> str:
     flow_states = [mona.Variable(f"F{s}") for s in system.states]
     precondition = mona.Conjunction([mona.PredicateCall("invariant",
         flow_states),
         mona.PredicateCall("uniquely_intersects_initial", flow_states)])
     postcondition = mona.PredicateCall("unique_intersection",
             flow_states + system.states)
-    return mona.UniversalSecondOrder(flow_states,
-            mona.Implication(precondition, postcondition)).simplify().render()
+    return mona.PredicateDefinition("flow_invariant", system.states, [],
+            mona.UniversalSecondOrder(flow_states,
+                mona.Implication(precondition, postcondition))
+            ).simplify().render()
+
+@add_function
+def marking_predicate(system: system.System) -> str:
+    m = mona.Variable("m")
+    unique_in_component = mona.UniversalFirstOrder([m],
+            mona.Conjunction([mona.Disjunction([
+                mona.Conjunction([mona.ElementIn(m, pos)] + [
+                    mona.ElementNotIn(m, neg)
+                    for neg in c.states
+                    if neg != pos])
+                for pos in c.states]) for c in system.components]))
+    flow_invariant = mona.PredicateCall("flow_invariant", system.states)
+    trap_invariant = mona.PredicateCall("trap_invariant", system.states)
+    return mona.PredicateDefinition("marking", system.states, [],
+            mona.Conjunction([
+                unique_in_component,
+                flow_invariant,
+                trap_invariant,
+            ])).simplify().render()
+
 
 @add_function
 def render_property(system: system.System, name: str, formula: str) -> str:
@@ -397,10 +422,22 @@ def render_property(system: system.System, name: str, formula: str) -> str:
             mona.RawFormula(formula)).simplify().render()
 
 @add_function
-def render_property_check(system: system.System, property_name: str) -> str:
-    return mona.PredicateCall(property_name, system.states).render()
-
-def render_property_unreachability(system: system.System,
+def render_property_check(states: List[Union[str, mona.Variable]],
         property_name: str) -> str:
+    return mona.PredicateCall(property_name, states).render()
+
+@add_function
+def marking_predicate_call(states: List[Union[str, mona.Variable]]) -> str:
+    return mona.PredicateCall("marking", states).render()
+
+def render_base_theory(system: system.System) -> str:
+    template = env.get_template("base-theory.mona")
+    return template.render(system=system)
+
+def render_property_unreachability(system: system.System, property_name: str,
+        cached_base_theory: Optional[str]=None) -> str:
+    base_theory = (cached_base_theory if cached_base_theory
+            else render_base_theory(system))
     template = env.get_template("proof-script.mona")
-    return template.render(system=system, property_name=property_name)
+    return template.render(system=system, base_theory=base_theory,
+            property_name=property_name)

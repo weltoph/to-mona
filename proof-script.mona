@@ -1,95 +1,9 @@
-/* size of universe */
-var1 n;
+{{ base_theory }}
 
-2 <= n;
-
-/* marking variables */
 {% for s in system.states %}
 var2 {{ s }};
 {% endfor %}
 
-/*
-marking properties:
-  - mark one state for each component in any valid position
-  - mark for each copy of a component precisely one element
-*/
-all1 m: (0 <= m & m < n) => (
-{% for c in system.components %}
-  # considering component {{ c.name }}
-  {% if not loop.first %}& {% endif %}(
-  {% for s in c.states -%}
-    {% if not loop.first %} | {% endif %}(
-    # case {{ s }} is marked
-    m in {{ s }}
-    {% if c.states|length > 1 -%}
-    # but others are not
-    {% for o in c.states|reject("sameas", s) %} & m notin {{ o }}
-    {%- endfor %}
-    {%- endif %}
-    )
-  {%- endfor %}
-  )
-  {%- endfor %}
-);
+{{ marking_predicate_call(system.states) }};
 
-/* define looping is_next notion */
-pred is_next(var1 first_index, var1 succ_first_index) = (
-    (first_index < n-1 => (succ_first_index = first_index+1))
-  & (first_index = n-1 => (succ_first_index = 0))
-);
-
-/* check if an element is the last index */
-pred is_last(var1 last) = (
-  last + 1 = n
-);
-
-/* define an intersection between two sets */
-{{ intersection_predicate(system) }}
-
-/* define a unique intersection between two sets */
-{{ unique_intersection_predicate(system) }}
-
-/* define an intersection with the initial marking */
-{{ intersects_initial_predicate(system) }}
-
-/* define a unique intersection with the initial marking */
-{{ uniquely_intersects_initial_predicate(system) }}
-
-/* define transition predicates: */
-{% for clause in system.interaction %}
-/* introduce predicate to describe deadlock of {{ clause }} */
-{{ transition_dead_predicate(system, clause, loop.index) }}
-
-/* introduce predicate to describe trap condition of {{ clause }} */
-{{ transition_trap_predicate(system, clause, loop.index) }}
-
-/* introduce predicate to describe flow invariant condition of {{ clause }} */
-{{ transition_invariant_predicate(system, clause, loop.index) }}
-{% endfor %}
-
-/* predicate to describe a deadlock */
-{{ deadlock_predicate(system) }}
-
-/* predicate to describe a trap */
-{{ trap_predicate(system) }}
-
-/* predicate to describe a flow invariant */
-{{ invariant_predicate(system) }}
-
-/* invariant that every initially marked trap has to be marked by any marking */
-{{ trap_invariant(system) }};
-
-/* invariant that every initially uniquely marked flow has to be marked by precisely one place by any marking */
-{{ flow_invariant(system) }};
-
-{% for name, assumption in system.assumptions.items() %}
-/* custom assumption {{ name }} */
-{{ assumption }};
-{% endfor %}
-
-{% for name, formula in system.properties.items() %}
-/* custom property */
-{{ render_property(system, name, formula) }}
-{% endfor %}
-
-{{ render_property_check(system, property_name) }};
+{{ render_property_check(system.states, property_name) }};
