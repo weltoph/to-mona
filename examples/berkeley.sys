@@ -1,50 +1,71 @@
-# adapted from: https://person.dibris.unige.it/delzanno-giorgio/CacheProtocol/berkeley.hy
 Component Cell <invalid> {
-  invalid      -> isInvalid      -> invalid
-  unowned      -> isUnowned      -> unowned
-  exclusive    -> isExclusive    -> exclusive
-  nonexclusive -> isNonexclusive -> nonexclusive
+  invalid      -> isInvalid              -> invalid
+  unowned      -> isUnowned              -> unowned
+  exclusive    -> isExclusive            -> exclusive
+  nonexclusive -> isNonexclusive         -> nonexclusive
 
-  exclusive -> shareExclusive -> nonexclusive
+  invalid      -> shareInvalid           -> nonexclusive
+  unowned      -> shareUnowned           -> nonexclusive
+  exclusive    -> shareExclusive         -> nonexclusive
 
-  invalid -> disownInvalid -> unowned
+  invalid      -> yieldInvalid           -> unowned
+  exclusive    -> yieldExclusive         -> unowned
+  nonexclusive -> yieldNonexclusive      -> unowned
 
   unowned      -> invalidateUnowned      -> invalid
   exclusive    -> invalidateExclusive    -> invalid
   nonexclusive -> invalidateNonexclusive -> invalid
 
-  nonexclusive -> exclusifyNonexclusive -> exclusive
-  unowned      -> exclusifyUnowned      -> exclusive
-  invalid      -> exclusifyInvalid      -> exclusive
+  nonexclusive -> exclusifyNonexclusive  -> exclusive
+  unowned      -> exclusifyUnowned       -> exclusive
+  invalid      -> exclusifyInvalid       -> exclusive
 }
 
 Formula {
-  # read miss
-  disownInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
-                                           | isUnowned(o)
-                                           | isNonexclusive(o)
-                                           | shareExclusive(o) };
-
-  # write hit
-  exclusifyNonexclusive(i) broadcasting { o: o ~= i. isExclusive(o)
-                                                   | isInvalid(o)
-                                                   | invalidateUnowned(o)
-                                                   | invalidateNonexclusive(o) };
-
-  exclusifyUnowned(i) broadcasting { o: o ~= i. isExclusive(o)
-                                              | isInvalid(o)
-                                              | invalidateUnowned(o)
-                                              | invalidateNonexclusive(o) };
-  # write miss
+  # Symbol R
+  ## state invalid
+  yieldInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | isNonexclusive(o)
+                                          | shareExclusive(o)
+                                          | isUnowned(o) };
+  ## state unowned
+  isUnowned(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | isNonexclusive(o)
+                                          | shareExclusive(o)
+                                          | isUnowned(o) };
+  ## state exclusive
+  isExclusive(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | isNonexclusive(o)
+                                          | shareExclusive(o)
+                                          | isUnowned(o) };
+  ## state nonexclusive
+  isNonexclusive(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | isNonexclusive(o)
+                                          | shareExclusive(o)
+                                          | isUnowned(o) };
+  # Symbol WO
+  ## state invalid
   exclusifyInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
-                                              | invalidateUnowned(o)
-                                              | invalidateExclusive(o)
-                                              | invalidateNonexclusive(o) };
-
-  # replacement
-  invalidateUnowned(i);
-  invalidateExclusive(i);
-  invalidateNonexclusive(i);
+                                             | invalidateNonexclusive(o)
+                                             | invalidateExclusive(o)
+                                             | invalidateUnowned(o) };
+  # Symbol WI
+  ## state unowned
+  exclusifyUnowned(i) broadcasting { o: o ~= i. isInvalid(o)
+                                             | invalidateNonexclusive(o)
+                                             | isExclusive(o)
+                                             | invalidateUnowned(o) };
+  ## state nonexclusive
+  exclusifyNonexclusive(i) broadcasting { o: o ~= i. isInvalid(o)
+                                             | invalidateNonexclusive(o)
+                                             | isExclusive(o)
+                                             | invalidateUnowned(o) };
+  # Symbol W
+  ## state exclusive
+  isExclusive(i) broadcasting { o: o ~= i. isInvalid(o)
+                                         | isNonexclusive(o)
+                                         | isExclusive(o)
+                                         | isInvalid(o) };
 }
 
 property "exclusiveexclusive" {

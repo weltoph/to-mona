@@ -1,61 +1,107 @@
-# adapted from https://person.dibris.unige.it/delzanno-giorgio/CacheProtocol/firefly.hy
-
 Component Cell <invalid> {
-  invalid   -> isInvalid   -> invalid
-  dirty     -> isDirty     -> dirty
-  exclusive -> isExclusive -> exclusive
-  shared    -> isShared    -> shared
+  invalid   -> isInvalid           -> invalid
+  dirty     -> isDirty             -> dirty
+  exclusive -> isExclusive         -> exclusive
+  shared    -> isShared            -> shared
 
-  invalid -> exclusifyInvalid -> exclusive
-  shared  -> exclusifyShared  -> exclusive
+  invalid -> exclusifyInvalid      -> exclusive
+  dirty   -> exclusifyDirty        -> exclusive
+  shared  -> exclusifyShared       -> exclusive
 
-  invalid   -> shareInvalid   -> shared
-  dirty     -> shareDirty     -> shared
-  exclusive -> shareExclusive -> shared
+  invalid   -> shareInvalid        -> shared
+  dirty     -> shareDirty          -> shared
+  exclusive -> shareExclusive      -> shared
 
-  shared    -> invalidateShared    -> invalid
   dirty     -> invalidateDirty     -> invalid
   exclusive -> invalidateExclusive -> invalid
+  shared    -> invalidateShared    -> invalid
 
-  exclusive -> taintExclusive -> dirty
-  invalid   -> taintInvalid   -> dirty
+  invalid   -> taintInvalid        -> dirty
+  dirty     -> taintDirty          -> dirty
+  exclusive -> taintExclusive      -> dirty
 }
 
 Formula {
-  # read miss
+  # Symbol R
+
+  ## state invalid
+
+  ### case #dirty = 0 ^ #shared = 0 ^ #exclusive = 0 <=> #invalid = n
   exclusifyInvalid(i) broadcasting { o: o ~= i. isInvalid(o) };
 
-  i ~= j. shareInvalid(i) & shareDirty(j);
+  ### case #dirty > 0: dirty process moves to shared
+  i ~= j. shareInvalid(i) & shareDirty(j) broadcasting {
+    o: o ~= i & o ~= j. isInvalid(o)
+                      | shareDirty(o)
+                      | isShared(o)
+                      | shareExclusive(o)
+  };
 
-  i ~= j. shareInvalid(i) & isShared(j) broadcasting { o: o ~= i & o ~= j.
-    isShared(o) | isDirty(o) | isInvalid(o) | shareExclusive(o) };
+  ### case #shared > 0: shared process stays in shared
+  i ~= j. shareInvalid(i) & isShared(j) broadcasting {
+    o: o ~= i & o ~= j. isInvalid(o)
+                      | shareDirty(o)
+                      | isShared(o)
+                      | shareExclusive(o)
+  };
 
-  i ~= j. shareInvalid(i) & shareExclusive(o) broadcasting { o:
-    o ~= i & o ~= j.
-    isShared(o) | isDirty(o) | isInvalid(o) | shareExclusive(o) };
+  ### case #exclusive > 0: exclusive process moves to shared
+  i ~= j. shareInvalid(i) & shareExclusive(j) broadcasting {
+    o: o ~= i & o ~= j. isInvalid(o)
+                      | shareDirty(o)
+                      | isShared(o)
+                      | shareExclusive(o)
+  };
 
-  # write hit
-  taintExclusive(i);
+  ## state exclusive
+  isExclusive(i) broadcasting {
+    o: o ~= i & o ~= j. isInvalid(o)
+                      | shareDirty(o)
+                      | isShared(o)
+                      | shareExclusive(o)
+  };
 
-  exclusifyShared(i) broadcasting { o: o ~= i.
-    isDirty(o) | isInvalid(o) | isExclusive(o) };
+  ## state dirty
+  isDirty(i) broadcasting {
+    o: o ~= i & o ~= j. isInvalid(o)
+                      | shareDirty(o)
+                      | isShared(o)
+                      | shareExclusive(o)
+  };
 
-  # write miss
-  taintInvalid(i) broadcasting { o: o ~= i.  isInvalid(o) };
+  # Symbol WI
 
-  i ~= j. shareInvalid(i) & shareDirty(j);
+  ## state invalid
+  taintInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | invalidateExclusive(o)
+                                          | invalidateDirty(o)
+                                          | invalidateShared(o) };
 
-  i ~= j. shareInvalid(i) & isShared(j) broadcasting { o: o ~= i & o ~= j.
-    isShared(o) | isDirty(o) | isInvalid(o) | shareExclusive(o) };
+  # Symbol W
 
-  i ~= j. shareInvalid(i) & shareExclusive(o) broadcasting { o:
-    o ~= i & o ~= j.
-    isShared(o) | isDirty(o) | isInvalid(o) | shareExclusive(o) };
+  ## state dirty
+  isDirty(i) broadcasting { o: o ~= i. isInvalid(o)
+                                     | isExclusive(o)
+                                     | isDirty(o)
+                                     | isShared(o) };
 
-  # replacement
-  invalidateDirty(i);
-  invalidateExclusive(i);
-  invalidateShared(i);
+  ## state exclusive
+  taintExclusive(i) broadcasting { o: o ~= i. isInvalid(o)
+                                     | isExclusive(o)
+                                     | isDirty(o)
+                                     | isShared(o) };
+
+  ## state shared
+  ### case #shared = 1
+  exclusifyShared(i) broadcasting { o: o ~= i. isInvalid(o)
+                                             | isExclusive(o)
+                                             | isDirty(o) };
+  ### case #shared > 1
+  i ~= j. isShared(i) & isShared(j) broadcasting { o: o ~= i & o ~= j.
+                                                      isInvalid(o)
+                                                    | isExclusive(o)
+                                                    | isDirty(o)
+                                                    | isShared(o) };
 }
 
 property "dirtydirty" {
