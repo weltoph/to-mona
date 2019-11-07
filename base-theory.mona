@@ -44,8 +44,14 @@ pred is_last(var1 last) = (
 /* predicate to describe a trap */
 {{ trap_predicate(system) }}
 
+/* predicate to describe an initially marked trap */
+{{ initially_marked_trap_predicate(system) }}
+
 /* predicate to describe a flow invariant */
 {{ invariant_predicate(system) }}
+
+/* predicate to describe an initially uniquely marked flow invariant */
+{{ initially_uniquely_marked_flow_predicate(system) }}
 
 /* invariant that every initially marked trap has to be marked by any marking */
 {{ trap_invariant_predicate(system) }}

@@ -1,59 +1,103 @@
-# adapted from: https://person.dibris.unige.it/delzanno-giorgio/CacheProtocol/moesi.hy
 Component Cell <invalid> {
+  invalid   -> isInvalid           -> invalid
+  modified  -> isModified          -> modified
+  exclusive -> isExclusive         -> exclusive
+  shared    -> isShared            -> shared
+  owned     -> isOwned             -> owned
+
   invalid   -> shareInvalid        -> shared
   modified  -> shareModified       -> shared
   exclusive -> shareExclusive      -> shared
   owned     -> shareOwned          -> shared
-  shared    -> shareShared         -> shared
 
+  invalid   -> ownInvalid          -> owned
   modified  -> ownModified         -> owned
-  owned     -> ownOwned            -> owned
+  exclusive -> ownExclusive        -> owned
+  shared    -> ownShared           -> owned
 
   modified  -> invalidateModified  -> invalid
   exclusive -> invalidateExclusive -> invalid
   shared    -> invalidateShared    -> invalid
-  invalid   -> invalidateInvalid   -> invalid
   owned     -> invalidateOwned     -> invalid
 
   exclusive -> modifyExclusive     -> modified
+  invalid   -> modifyInvalid       -> modified
+  shared    -> modifyShared        -> modified
+  owned     -> modifyOwned         -> modified
 
+  modified  -> exclusifyModified   -> exclusive
+  invalid   -> exclusifyInvalid    -> exclusive
   shared    -> exclusifyShared     -> exclusive
   owned     -> exclusifyOwned      -> exclusive
-  invalid   -> exclusifyInvalid    -> exclusive
 }
 
 Formula {
-  # read miss
-  shareInvalid(i) broadcasting { o: o ~= i. shareShared(o)
-                                          | invalidateInvalid(o)
+  # Symbol R
+  ## state invalid
+  shareInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | isShared(o)
                                           | shareExclusive(o)
-                                          | ownOwned(o)
+                                          | isOwned(o)
                                           | ownModified(o) };
-  # write hit
-  modifyExclusive(i);
-  exclusifyShared(i) broadcasting { o: o ~= i. invalidateModified(o)
-                                             | invalidateExclusive(o)
-                                             | invalidateShared(o)
-                                             | invalidateInvalid(o)
-                                             | invalidateOwned(o) };
+  ## state modified
+  isModified(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | isShared(o)
+                                          | shareExclusive(o)
+                                          | isOwned(o)
+                                          | ownModified(o) };
+  ## state exclusive
+  isExclusive(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | isShared(o)
+                                          | shareExclusive(o)
+                                          | isOwned(o)
+                                          | ownModified(o) };
+  ## state shared
+  isShared(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | isShared(o)
+                                          | shareExclusive(o)
+                                          | isOwned(o)
+                                          | ownModified(o) };
+  ## state owned
+  isModified(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | isShared(o)
+                                          | shareExclusive(o)
+                                          | isOwned(o)
+                                          | ownModified(o) };
 
-  exclusifyOwned(i) broadcasting { o: o ~= i. invalidateModified(o)
-                                            | invalidateExclusive(o)
-                                            | invalidateShared(o)
-                                            | invalidateInvalid(o)
-                                            | invalidateOwned(o) };
-  # write miss
-  exclusifyInvalid(i) broadcasting { o: o ~= i. invalidateModified(o)
-                                              | invalidateExclusive(o)
+  # Symbol W
+  ## state modified
+  isModified(i) broadcasting { o: o ~= i. isInvalid(o)
+                                        | isModified(o)
+                                        | isExclusive(o)
+                                        | isShared(o)
+                                        | isOwned(o) };
+  ## state exclusive
+  modifyExclusive(i) broadcasting { o: o ~= i. isInvalid(o)
+                                        | isModified(o)
+                                        | isExclusive(o)
+                                        | isShared(o)
+                                        | isOwned(o) };
+
+  # Symbol WI
+  ## state invalid
+  exclusifyInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
                                               | invalidateShared(o)
-                                              | invalidateInvalid(o)
+                                              | invalidateModified(o)
+                                              | invalidateExclusive(o)
+                                              | invalidateOwned(o) };
+  ## state shared
+  exclusifyShared(i) broadcasting { o: o ~= i. isInvalid(o)
+                                              | invalidateShared(o)
+                                              | invalidateModified(o)
+                                              | invalidateExclusive(o)
                                               | invalidateOwned(o) };
 
-  # replacement
-  invalidateModified(i);
-  invalidateExclusive(i);
-  invalidateShared(i);
-  invalidateOwned(i);
+  ## state owned
+  exclusifyOwned(i) broadcasting { o: o ~= i. isInvalid(o)
+                                              | invalidateShared(o)
+                                              | invalidateModified(o)
+                                              | invalidateExclusive(o)
+                                              | invalidateOwned(o) };
 }
 
 property "modifiedmodified" {

@@ -1,26 +1,52 @@
-# adapted from: https://person.dibris.unige.it/delzanno-giorgio/CacheProtocol/synapse.hy
 Component Cell <invalid> {
-  invalid -> readMiss -> valid
-  invalid -> invalidateInvalid -> invalid
-  dirty -> invalidateDirty -> invalid
-  valid -> invalidateValid -> invalid
-  valid -> writeHit -> dirty
-  invalid -> writeMiss -> dirty
+  invalid -> validateInvalid -> valid
+  dirty   -> validateDirty   -> valid
+
+  dirty   -> invalidateDirty -> invalid
+  valid   -> invalidateValid -> invalid
+
+  valid   -> taintValid      -> dirty
+  invalid -> taintInvalid    -> dirty
+
+  invalid -> isInvalid       -> invalid
+  dirty   -> isDirty         -> dirty
+  valid   -> isValid         -> valid
 }
 
 
 Formula {
-  readMiss(i) broadcasting {o: o ~= i. invalidateInvalid(o)
-                                     | invalidateDirty(o) };
-  writeHit(i) broadcasting {o: o ~= i. invalidateInvalid(o)
+  # Symbol W
+
+  ## state invalid
+  taintInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
+                                          | invalidateDirty(o)
+                                          | invalidateValid(o) };
+  ## state dirty
+  isDirty(i) broadcasting { o: o ~= i. isInvalid(o)
                                      | invalidateDirty(o)
                                      | invalidateValid(o) };
 
-  writeMiss(i) broadcasting {o: o ~= i. invalidateInvalid(o)
-                                      | invalidateDirty(o)
-                                      | invalidateValid(o) };
-  invalidateDirty(i);
-  invalidateValid(i);
+  ## state valid
+  taintValid(i) broadcasting { o: o ~= i. isInvalid(o)
+                                        | invalidateDirty(o)
+                                        | invalidateValid(o) };
+
+  # Symbol R
+
+  ## state invalid
+  validateInvalid(i) broadcasting { o: o ~= i. isInvalid(o)
+                                             | isValid(o)
+                                             | invalidateDirty(o) };
+
+  ## state dirty
+  isDirty(i) broadcasting { o: o ~= i. isInvalid(o)
+                                     | isValid(o)
+                                     | invalidateDirty(o) };
+
+  ## state valid
+  isValid(i) broadcasting { o: o ~= i. isInvalid(o)
+                                     | isValid(o)
+                                     | invalidateDirty(o) };
 }
 
 property "dirtydirty" {

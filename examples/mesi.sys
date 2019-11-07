@@ -1,33 +1,76 @@
-# adapted from: https://person.dibris.unige.it/delzanno-giorgio/CacheProtocol/mesi.hy
 Component Cell <invalid> {
-  invalid -> invalidateInvalid -> invalid
-  invalid -> sharedInvalid -> shared
-  modified -> shareModified -> shared
-  exclusive -> shareExclusive -> shared
-  exclusive -> modifyExclusive -> modified
-  shared -> modifyShared -> exclusive
-  modified -> invalidateModified -> invalid
+  invalid   -> isInvalid   -> invalid
+  exclusive -> isExclusive -> exclusive
+  modified  -> isModified  -> modified
+  shared    -> isShared    -> shared
+
   exclusive -> invalidateExclusive -> invalid
-  shared -> invalidateShared -> invalid
-  invalid -> writeInvalid -> exclusive
+  modified  -> invalidateModified  -> invalid
+  shared    -> invalidateShared    -> invalid
+
+  invalid   -> shareInvalid   -> shared
+  exclusive -> shareExclusive -> shared
+  modified  -> shareModified  -> shared
+
+  invalid   -> modifyInvalid   -> modified
+  exclusive -> modifyExclusive -> modified
+  shared    -> modifyShared    -> modified
+
+  invalid  -> exclusifyInvalid  -> exclusive
+  modified -> exclusifyModified -> exclusive
+  shared   -> exclusifyShared   -> exclusive
 }
 
 Formula {
-  sharedInvalid(i) broadcasting {o: o ~= i. invalidateInvalid(o)
-                                          | shareModified(o)
-                                          | shareExclusive(o) };
-  modifyExclusive(i);
-  modifyShared(i) broadcasting {o: o ~= i. invalidateInvalid(o)
-                                         | invalidateModified(o)
-                                         | invalidateExclusive(o)
-                                         | invalidateShared(o) };
-  writeInvalid(i) broadcasting {o: o ~= i. invalidateInvalid(o)
-                                         | invalidateModified(o)
-                                         | invalidateExclusive(o)
-                                         | invalidateShared(o) };
-  invalidateModified(i);
-  invalidateShared(i);
-  invalidateExclusive(i);
+  # Symbol W
+
+  ## state invalid
+  exclusifyInvalid(i) broadcasting {o: o ~= i. isInvalid(o)
+                                             | invalidateExclusive(o)
+                                             | invalidateShared(o)
+                                             | invalidateModified(o) };
+
+  ## state exclusive
+  modifyExclusive(i) broadcasting {o: o ~= i. isInvalid(o)
+                                            | invalidateExclusive(o)
+                                            | invalidateShared(o)
+                                            | invalidateModified(o) };
+
+  ## state modified
+  isModified(i) broadcasting {o: o ~= i. isInvalid(o)
+                                       | invalidateExclusive(o)
+                                       | invalidateShared(o)
+                                       | invalidateModified(o) };
+
+  ## state shared
+  exclusifyShared(i) broadcasting {o: o ~= i. isInvalid(o)
+                                            | invalidateExclusive(o)
+                                            | invalidateShared(o)
+                                            | invalidateModified(o) };
+
+  # Symbol R
+
+  ## state invalid
+  shareInvalid(i) broadcasting {o: o ~= i. isInvalid(o)
+                                         | shareExclusive(o)
+                                         | shareModified(o)
+                                         | isShared(o) };
+  ## state exclusive
+  isExclusive(i) broadcasting {o: o ~= i. isInvalid(o)
+                                        | shareExclusive(o)
+                                        | shareModified(o)
+                                        | isShared(o) };
+
+  ## state modified
+  isModified(i) broadcasting {o: o ~= i. isInvalid(o)
+                                       | shareExclusive(o)
+                                       | shareModified(o)
+                                       | isShared(o) };
+  ## state shared
+  isShared(i) broadcasting {o: o ~= i. isInvalid(o)
+                                     | shareExclusive(o)
+                                     | shareModified(o)
+                                     | isShared(o) };
 }
 
 property "modifiedmodified" {

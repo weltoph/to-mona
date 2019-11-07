@@ -196,10 +196,16 @@ def deadlock_predicate(system: system.System) -> str:
             inner).simplify().render()
 
 @add_function
+def initially_marked_trap_predicate(system: system.System) -> str:
+    inner = mona.Conjunction([mona.PredicateCall("trap", system.states),
+        mona.PredicateCall("intersects_initial", system.states)])
+    return mona.PredicateDefinition("initially_marked_trap", system.states, [],
+            inner).simplify().render()
+
+@add_function
 def trap_invariant_predicate(system: system.System) -> str:
     trap_states = [mona.Variable(f"T{s}") for s in system.states]
-    precondition = mona.Conjunction([mona.PredicateCall("trap", trap_states),
-        mona.PredicateCall("intersects_initial", trap_states)])
+    precondition = mona.PredicateCall("initially_marked_trap", trap_states)
     postcondition = mona.PredicateCall("intersection",
             trap_states + system.states)
     return mona.PredicateDefinition("trap_invariant", system.states, [],
@@ -384,11 +390,17 @@ def invariant_predicate(system: system.System) -> str:
             system.states, [], inner).simplify().render()
 
 @add_function
+def initially_uniquely_marked_flow_predicate(system: system.System) -> str:
+    inner = mona.Conjunction([mona.PredicateCall("invariant", system.states),
+        mona.PredicateCall("uniquely_intersects_initial", system.states)])
+    return mona.PredicateDefinition("initially_uniquely_marked_flow",
+            system.states, [], inner).simplify().render()
+
+@add_function
 def flow_invariant_predicate(system: system.System) -> str:
     flow_states = [mona.Variable(f"F{s}") for s in system.states]
-    precondition = mona.Conjunction([mona.PredicateCall("invariant",
-        flow_states),
-        mona.PredicateCall("uniquely_intersects_initial", flow_states)])
+    precondition = mona.PredicateCall("initially_uniquely_marked_flow",
+            flow_states)
     postcondition = mona.PredicateCall("unique_intersection",
             flow_states + system.states)
     return mona.PredicateDefinition("flow_invariant", system.states, [],
