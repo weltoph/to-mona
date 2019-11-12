@@ -68,13 +68,13 @@ class Component:
 @unique
 class SystemAddition(Enum):
     PROPERTY = "property"
-    ASSUMPTION = "assumption"
+    PREDICATE = "assumption"
 
 @dataclass
 class System:
     components: List[Component]
     interaction: List[Clause]
-    assumptions: Dict[str, str]
+    predicates: Dict[str, Tuple[str, str]]
     properties: Dict[str, str]
 
     @property

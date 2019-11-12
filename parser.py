@@ -9,11 +9,11 @@ grammar = """
 
     components: component (component)*
 
-    mona_additions: (custom_property|custom_assumption) (custom_property|custom_assumption)*
+    mona_additions: (custom_property|custom_predicate) (custom_property|custom_predicate)*
 
     custom_property: "property" STRING "{" STRING "}"
 
-    custom_assumption: "assumption" STRING "{" STRING "}"
+    custom_predicate: "predicate" STRING "<" variable ">" "{" STRING "}"
 
     component: "Component" COMPONENTNAME "<" STATENAME ">" "{" transition (transition)* "}"
     transition: STATENAME "->" STATENAME "->" STATENAME
@@ -199,9 +199,10 @@ class PropertyParser(Transformer):
         return (SystemAddition.PROPERTY, str(name)[1:-1], str(value)[1:-1])
 
     @v_args(inline=True)
-    def custom_assumption(self, name, value):
+    def custom_predicate(self, name, value):
         from system import SystemAddition
-        return (SystemAddition.ASSUMPTION, str(name)[1:-1], str(value)[1:-1])
+        return (SystemAddition.PREDICATE, str(name)[1:-1], variable.name,
+                str(value)[1:-1])
 
     def mona_additions(self, additions):
         return additions
@@ -216,10 +217,16 @@ class SystemParser(Transformer):
     def restricted_system(self, components, interaction, additions):
         from system import System, SystemAddition
         return System(components, interaction,
-                {name: value for kind, name, value in additions
-                    if kind == SystemAddition.ASSUMPTION},
-                {name: value for kind, name, value in additions
-                    if kind == SystemAddition.PROPERTY})
+                {name: (variable, value)
+                    for name, variable, value
+                    in [(a[1], a[2], a[3]) for a in additions
+                    if a[0] == SystemAddition.PREDICATE]
+                },
+                {name: value
+                    for name, value
+                    in [(a[1], a[2]) for a in additions
+                        if a[0] == SystemAddition.PROPERTY]
+                })
 
 def parse_file(filename):
     with open(filename, "r") as f:

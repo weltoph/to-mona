@@ -442,6 +442,10 @@ def render_property_check(states: List[Union[str, mona.Variable]],
 def marking_predicate_call(states: List[Union[str, mona.Variable]]) -> str:
     return mona.PredicateCall("marking", states).render()
 
+@add_function
+def custom_predicate(name: str, variable: str, formula: str) -> str:
+    return mona.PredicateDefinition(name, [], [variable], formula).render()
+
 def render_base_theory(system: system.System) -> str:
     template = env.get_template("base-theory.mona")
     return template.render(system=system)

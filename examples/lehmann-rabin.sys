@@ -1,9 +1,33 @@
 Component Philosopher <waiting> {
+  waiting      -> grabLeftFirst   -> holdingLeft
+  waiting      -> grabRightFirst  -> holdingRight
+  holdingRight -> grabLeftSecond  -> eating
+  holdingLeft  -> grabRightSecond -> eating
+  holdingLeft  -> dropLeft        -> waiting
+  holdingRight -> dropRight       -> waiting
+  eating       -> dropBoth        -> waiting
 }
 
 Component Fork <free> {
-  free -> grabbed -> occupied
-  occupied -> dropped -> free
-  free -> isFree -> free
+  free     -> grabbed    -> occupied
+  occupied -> dropped    -> free
+  free     -> isFree     -> free
   occupied -> isOccupied -> occupied
+}
+
+Formula {
+  # pick one fork at the beginning
+  grabLeftFirst(i)   & grabbed(i);
+  grabRightFirst(i)  & grabbed(succ(i));
+
+  # pick the other fork second
+  grabLeftSecond(i)  & grabbed(i);
+  grabRightSecond(i) & grabbed(succ(i));
+
+  # drop both forks
+  dropped(i) & dropBoth(i) & dropped(succ(i));
+
+  # drop already grabbed fork
+  dropLeft(i) & dropped(i) & isOccupied(succ(i));
+  dropRight(i) & dropped(succ(i)) & isOccupied(i);
 }

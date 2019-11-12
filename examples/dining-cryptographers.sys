@@ -1,0 +1,25 @@
+Component Payment <init> {
+  init -> pay -> paid
+  init -> freeload -> freeloaded
+}
+
+Component Cryptographer <init> {
+  init -> start -> undecided
+  undecided -> yes -> agree
+  undecided -> no  -> disagree
+
+  agree -> negateAgree -> disagree
+  disagree -> negateDisagree -> agree
+
+  agree -> finalizeAgree -> final_agree
+  disagree -> finalizeDisagree -> final_disagree
+}
+
+Formula {
+  # one of the cryptographers pay
+  pay(i) & start(i) broadcasting { p: p ~= i. freeload(p) }
+                    broadcasting { c: c ~= i. start(c)    };
+  # all cryptographers freeload
+  freeload(i) & start(i) broadcasting { p: p ~= i. freeload(p) }
+                         broadcasting { c: c ~= i. start(c)    };
+}
