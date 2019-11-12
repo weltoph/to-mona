@@ -1,0 +1,26 @@
+Component Agent <init> {
+  init -> withToken    -> token
+  init -> withoutToken -> noToken
+
+  token -> remToken -> noToken
+  noToken -> addToken -> token
+
+  token -> hasToken -> token
+  noToken -> isEmpty  -> noToken
+}
+
+Formula {
+  # init with at least one token
+  withToken(i) broadcasting {o: o ~= i. withToken(o) | withoutToken(o) };
+
+  # merge two tokens
+  i < j. remToken(i) & hasToken(j) broadcasting {o: i < o & o < j. isEmpty(o) };
+  i < j. hasToken(i) & remToken(j) broadcasting {o: j < o | o < i. isEmpty(o) };
+
+  # move token
+  i ~= j. remToken(i) & addToken(j);
+}
+
+property "missingToken" {
+  "all1 x: (0 <= x & x < n) => (x in noToken)"
+}

@@ -1,0 +1,9 @@
+Component Philosopher <waiting> {
+}
+
+Component Fork <free> {
+  free -> grabbed -> occupied
+  occupied -> dropped -> free
+  free -> isFree -> free
+  occupied -> isOccupied -> occupied
+}

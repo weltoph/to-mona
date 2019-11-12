@@ -1,27 +1,45 @@
-Component Cell <invalid> {
+Component Cell <init> {
   invalid   -> isInvalid           -> invalid
   dirty     -> isDirty             -> dirty
   exclusive -> isExclusive         -> exclusive
   shared    -> isShared            -> shared
 
-  invalid -> exclusifyInvalid      -> exclusive
-  dirty   -> exclusifyDirty        -> exclusive
-  shared  -> exclusifyShared       -> exclusive
+  init      -> exclusifyInit       -> exclusive
+  invalid   -> exclusifyInvalid    -> exclusive
+  dirty     -> exclusifyDirty      -> exclusive
+  shared    -> exclusifyShared     -> exclusive
 
+  init      -> shareInit           -> shared
   invalid   -> shareInvalid        -> shared
   dirty     -> shareDirty          -> shared
   exclusive -> shareExclusive      -> shared
 
+  init      -> invalidateInit      -> invalid
   dirty     -> invalidateDirty     -> invalid
   exclusive -> invalidateExclusive -> invalid
   shared    -> invalidateShared    -> invalid
 
+  init      -> taintInit           -> dirty
   invalid   -> taintInvalid        -> dirty
   dirty     -> taintDirty          -> dirty
   exclusive -> taintExclusive      -> dirty
 }
 
 Formula {
+  #############################################################################
+  # initially all processes are in init and the first signal is actively      #
+  # processed by 0 and passively processed by all others                      #
+  #############################################################################
+  # Symbol R init
+  exclusifyInit(0) broadcasting { o: o ~= 0. invalidateInit(o) };
+
+  # Symbol WI init
+  taintInit(0) broadcasting { o: o ~= 0. invalidateInit(o) };
+
+  #############################################################################
+  # from here on onwards the automaton is modelled honestly                   #
+  #############################################################################
+
   # Symbol R
 
   ## state invalid
@@ -80,16 +98,10 @@ Formula {
   # Symbol W
 
   ## state dirty
-  isDirty(i) broadcasting { o: o ~= i. isInvalid(o)
-                                     | isExclusive(o)
-                                     | isDirty(o)
-                                     | isShared(o) };
+  isDirty(i);
 
   ## state exclusive
-  taintExclusive(i) broadcasting { o: o ~= i. isInvalid(o)
-                                     | isExclusive(o)
-                                     | isDirty(o)
-                                     | isShared(o) };
+  taintExclusive(i);
 
   ## state shared
   ### case #shared = 1
@@ -97,11 +109,7 @@ Formula {
                                              | isExclusive(o)
                                              | isDirty(o) };
   ### case #shared > 1
-  i ~= j. isShared(i) & isShared(j) broadcasting { o: o ~= i & o ~= j.
-                                                      isInvalid(o)
-                                                    | isExclusive(o)
-                                                    | isDirty(o)
-                                                    | isShared(o) };
+  i ~= j. isShared(i) & isShared(j);
 }
 
 property "dirtydirty" {
