@@ -14,10 +14,9 @@ pred is_last(var1 last) = (
   last + 1 = n
 );
 
-{% for name, content in system.predicates.items() %}
-{%- set variable, formula = content -%}
-/* custom predicate {{ name }} */
-{{ custom_predicate(name, variable, formula) }};
+{% for name, assumption in system.assumptions.items() %}
+/* custom assumption {{ name }} */
+{{ assumption }};
 {% endfor %}
 
 /* define an intersection between two sets */

@@ -1,25 +1,93 @@
-Component Payment <init> {
-  init -> pay -> paid
-  init -> freeload -> freeloaded
+Component State <init> {
+  init -> ph -> PH
+  init -> pt -> PT
+
+  init -> fh -> FH
+  init -> ft -> FT
+
+  PH -> isPH -> PH
+  PT -> isPT -> PT
+  FH -> isFH -> FH
+  FT -> isFT -> FT
 }
 
-Component Cryptographer <init> {
-  init -> start -> undecided
-  undecided -> yes -> agree
-  undecided -> no  -> disagree
+Component Decision <undecided> {
+  undecided -> agree          -> agreed
+  undecided -> disagree       -> disagreed
 
-  agree -> negateAgree -> disagree
-  disagree -> negateDisagree -> agree
+  agreed    -> agrees         -> agreed
+  disagreed -> disagrees      -> disagreed
 
-  agree -> finalizeAgree -> final_agree
-  disagree -> finalizeDisagree -> final_disagree
+  agreed    -> swapToDisagree -> disagreed
+  disagreed -> swapToAgree    -> agreed
 }
 
 Formula {
-  # one of the cryptographers pay
-  pay(i) & start(i) broadcasting { p: p ~= i. freeload(p) }
-                    broadcasting { c: c ~= i. start(c)    };
-  # all cryptographers freeload
-  freeload(i) & start(i) broadcasting { p: p ~= i. freeload(p) }
-                         broadcasting { c: c ~= i. start(c)    };
+  # one of the cryptographers pay and flip coin heads
+  ph(i) broadcasting { p: p ~= i. fh(p) | ft(p) };
+  # one of the cryptographers pay and flip coin heads
+  pt(i) broadcasting { p: p ~= i. fh(p) | ft(p) };
+
+  # none of the cryptographers pays
+  broadcasting { p: fh(p) | ft(p) };
+
+  # freeloading agreeing cryptographer i
+  agree(i) & isFH(i) & isFH(succ(i));
+  agree(i) & isFH(i) & isPH(succ(i));
+  agree(i) & isFT(i) & isFT(succ(i));
+  agree(i) & isFT(i) & isPT(succ(i));
+
+  # paying agreeing cryptographer i
+  agree(i) & isPH(i) & isFH(succ(i));
+  agree(i) & isPH(i) & isFH(succ(i));
+
+  # freeloading disagreeing cryptographer i
+  disagree(i) & isFH(i) & isFT(succ(i));
+  disagree(i) & isFT(i) & isFH(succ(i));
+  disagree(i) & isFH(i) & isPT(succ(i));
+  disagree(i) & isFT(i) & isPH(succ(i));
+
+  # paying disagreeing cryptographer i
+  disagree(i) & isPH(i) & isFH(succ(i));
+  disagree(i) & isPT(i) & isFT(succ(i));
+
+  # cancel out two agrees until at most one agree is left (if there are odd
+  # agrees) or none (if there are even agrees)
+  i ~= j. swapToDisagree(i) & swapToDisagree(j);
+}
+
+assumption "Even" {
+  "var2 Even; 0 in Even; all1 x: (0 <= x & x < n + 2) => ((x in Even) <=> ((x+1) notin Even))"
+}
+
+assumption "end" {
+  "pred end(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 x: (0 <= x & x < n & ( x in agreed | x in disagreed ) & (all1 y: ((0 <= y & y < n & y ~= x) => y in disagreed))))"
+}
+
+assumption "payingMaster" {
+  "pred payingMaster(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = ((all1 x : (0 <= x & x < n) => ((x in FH | x in FT))))"
+}
+
+assumption "payingCryptographer" {
+  "pred payingCryptographer(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 y : (0 <= y & y < n & (y in PH | y in PT)))"
+}
+
+assumption "oddAgreed" {
+  "pred oddAgreed(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 x: (0 <= x & x < n & x in agreed))"
+}
+
+property "payingMasterNEven" {
+  "n in Even & end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingMaster(FH, FT, PH, PT, init, agreed, disagreed, undecided) & oddAgreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
+}
+
+property "payingMasterNOdd" {
+  "n notin Even & end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingMaster(FH, FT, PH, PT, init, agreed, disagreed, undecided) & ~oddAgreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
+}
+
+property "payingCryptographerNEven" {
+  "n in Even & end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingCryptographer(FH, FT, PH, PT, init, agreed, disagreed, undecided) & ~oddAgreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
+}
+
+property "payingCryptographerNOdd" {
+  "n notin Even & end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingCryptographer(FH, FT, PH, PT, init, agreed, disagreed, undecided) & oddAgreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
 }
