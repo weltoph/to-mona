@@ -1,30 +1,26 @@
-from dataclasses import dataclass, field
-from typing import List, Iterable, Set, Dict, Optional
+from dataclasses import dataclass
+
+from typing import List, Set, Dict, cast
+
+from system import System
+
 
 class FormulaError(Exception):
     pass
 
-class FormulaBase(object):
+
+@dataclass
+class FormulaBase:
+    system: System
+
     def __repr__(self):
         return f"{type(self)}<{str(self)}>"
 
-    def __repr__(self) -> str:
-        return f"{type(self)}<{self}>"
-
-    @property
-    def variables(self) -> Set["Variable"]:
-        return set()
-
-    @property
-    def sorted_variables(self) -> List["Variable"]:
-        return sorted(self.variables, key=str)
-
-    def rename(self, renaming : Dict[str, str]) -> "Term":
-        raise NotImplemented
-
-    @property
-    def all_terms(self) -> Set["Term"]:
-        return set()
+    def __post_init__(self):
+        self.variables: Set["Variable"] = set()
+        self.sorted_variables: List["Variable"] = sorted(self.variables,
+                                                         key=str)
+        self.all_terms: Set["Term"] = set()
 
     @property
     def sorted_terms(self) -> List["Term"]:
@@ -32,37 +28,45 @@ class FormulaBase(object):
 
     @property
     def complex_terms(self) -> List["Term"]:
-        return [term for term in self.sorted_terms if not term.is_atomic]
+        return [term for term in self.sorted_terms
+                if (type(term) is not Constant
+                    or type(term) is not Variable)]
 
     @property
-    def involved_variables(self) -> List["Term"]:
-        return [term for term in self.sorted_terms
-                if term.is_atomic and not term.is_constant]
+    def involved_variables(self) -> List["Variable"]:
+        involved_variables = []
+        for term in self.sorted_terms:
+            if type(term) is Variable:
+                term = cast(Variable, term)
+                involved_variables.append(term)
+        return involved_variables
+
+    def rename(self, renaming: Dict[str, str]) -> "FormulaBase":
+        raise NotImplementedError()
+
 
 class Formula(FormulaBase):
     pass
 
+
+@dataclass
 class Term(FormulaBase):
-    @property
-    def all_terms(self) -> Set["Term"]:
-        return {self} | self.sub_terms
+    def __post_init__(self):
+        super().__post_init__()
+        self.sub_terms: Set["Term"] = set()
+        self.all_terms: Set["Term"] = {self}
 
-    @property
-    def sub_terms(self) -> Set["Term"]:
-        return set()
-
-    @property
-    def is_constant(self) -> bool:
-        return False
-
-    @property
-    def is_atomic(self) -> bool:
-        return self.is_constant
+    def rename(self, rename: Dict[str, str]) -> "Term":
+        raise NotImplementedError()
 
 
 @dataclass
 class Constant(Term):
     value: int
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.all_terms: Set["Term"] = {self}
 
     def rename(self, renaming) -> "Constant":
         return Constant(self.value)
@@ -76,19 +80,17 @@ class Constant(Term):
     def __str__(self):
         return str(self.value)
 
-    @property
-    def is_constant(self) -> bool:
-        return True
 
 @dataclass
 class Variable(Term):
     name: str
 
-    @property
-    def variables(self) -> Set["Variable"]:
-        return {self}
+    def __post_init__(self):
+        super().__post_init__()
+        self.all_terms: Set["Term"] = {self}
+        self.variables: Set["Variable"] = {self}
 
-    def rename(self, renaming):
+    def rename(self, renaming: Dict[str, str]) -> "Variable":
         return Variable(renaming.get(self.name, self.name))
 
     def __hash__(self):
@@ -100,78 +102,51 @@ class Variable(Term):
     def __str__(self):
         return self.name
 
-    @property
-    def is_atomic(self) -> bool:
-        return True
 
 @dataclass
 class Successor(Term):
     argument: Term
 
+    def __post_init__(self):
+        super().__post_init__()
+        self.sub_terms: Set["Term"] = self.arguemnt.all_terms
+        self.variables: Set["Variable"] = self.argument.variables
+
     def __hash__(self):
-        return hash(self.argument)
+        return hash("succ") & hash(self.argument)
 
     def __eq__(self, other):
-        return type(self) == type(other) and (
+        return (type(self) == type(other) and
                 self.argument == other.argument)
 
-    @property
-    def variables(self) -> Set[Variable]:
-        return self.argument.variables
-
-    def rename(self, renaming : Dict[str, str]) -> "Successor":
+    def rename(self, renaming: Dict[str, str]) -> "Successor":
         return Successor(self.argument.rename(renaming))
-
-    @property
-    def sub_terms(self) -> Set[Term]:
-        return self.argument.all_terms
 
     def __str__(self) -> str:
         return f"succ({self.argument})"
+
 
 @dataclass
 class Predicate(Formula):
     name: str
     argument: Term
+    pre: str
+    post: str
 
     def __post_init__(self):
-        self._pre = None
-        self._post = None
-
-    @property
-    def pre(self):
-        if not self._pre:
-            raise FormulaError("Unbound predicate does not have a preset")
-        return self._pre
-
-    @property
-    def post(self):
-        if not self._post:
-            raise FormulaError("Unbound predicate does not have a postset")
-        return self._post
-
-    def bind(self, pre, post):
-        if self._pre or self._post:
-            raise FormulaError(f"Cannot re-bind predicate {self}")
-        self._pre = pre
-        self._post = post
+        super().__post_init__()
+        self.variables: Set[Variable] = self.argument.variables
+        self.all_terms: Set[Term] = self.argument.all_terms
 
     def __hash__(self):
         return hash(self.name) & hash(self.argument)
 
     def __eq__(self, other):
-        return type(self) == type(other) and (
-                self.name == other.name and self.argument == other.argument)
+        return (type(self) == type(other)
+                and self.name == other.name
+                and self.argument == other.argument)
 
-    @property
-    def variables(self) -> Set[Variable]:
-        return self.argument.variables
-
-    @property
-    def all_terms(self) -> Set[Term]:
-        return self.argument.all_terms
-
-    def rename(self, renaming):
+    def rename(self, renaming: Dict[str, str]) -> "Predicate":
         new_pred = Predicate(self.name, self.argument.rename(renaming))
         new_pred.bind(self._pre, self._post)
         return new_pred
@@ -179,60 +154,68 @@ class Predicate(Formula):
     def __str__(self):
         return f"{self.name}({self.argument})"
 
+
 @dataclass
 class PredicateCollection(Formula):
     predicates: Set[Predicate]
 
-    @property
-    def variables(self) -> Set[Variable]:
-        from functools import reduce
-        return set(reduce(
-            lambda acc, p: p.variables | acc,
-            self.predicates,
-            set()))
-
-    @property
-    def all_terms(self) -> Set[Term]:
-        from functools import reduce
-        return set(reduce(
-            lambda acc, p: p.all_terms | acc,
-            self.predicates,
-            set()))
+    def __post_init__(self):
+        super().__post_init__()
+        self.variables: Set[Variable] = set()
+        self.all_terms: Set[Term] = set()
+        self.comparison_symbol: str = ""
+        for p in self.predicates:
+            self.variables |= p.variables
+            self.all_terms |= p.all_terms
 
     def rename(self, renaming: Dict[str, str]) -> "PredicateCollection":
         return type(self)({p.rename(renaming) for p in self.predicates})
 
     def __str__(self) -> str:
         return f" {self.comparison_symbol} ".join([str(p) for
-            p in self.predicates])
+                                                   p in self.predicates])
+
 
 @dataclass
 class PredicateConjunction(PredicateCollection):
-    @property
-    def comparison_symbol(self) -> str:
-        return "&"
+    def __post_init__(self):
+        super().__post_init__()
+        self.comparison_symbol: str = "&"
+
+    def rename(self, renaming: Dict[str, str]) -> "PredicateConjunction":
+        return cast("PredicateConjunction", super().rename(renaming))
+
 
 @dataclass
 class PredicateDisjunction(PredicateCollection):
-    @property
-    def comparison_symbol(self) -> str:
-        return "|"
+    def __post_init__(self):
+        super().__post_init__()
+        self.comparison_symbol: str = "|"
+
+    def rename(self, renaming: Dict[str, str]) -> "PredicateDisjunction":
+        return cast("PredicateDisjunction", super().rename(renaming))
+
 
 @dataclass
 class Restriction(Formula):
-    pass
+    def rename(self, renaming: Dict[str, str]) -> "Restriction":
+        raise NotImplementedError()
+
 
 @dataclass
 class Last(Restriction):
     argument: Term
 
-    @property
-    def variables(self) -> Set[Variable]:
-        return self.argument.variables
+    def __hash__(self):
+        return hash("last") & hash(self.argument)
 
-    @property
-    def all_terms(self) -> Set[Term]:
-        return self.argument.all_terms
+    def __eq__(self, other):
+        return type(self) is type(other) and self.argument == other.argument
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.variables: Set[Variable] = self.argument.variables
+        self.all_terms: Set[Term] = self.argument.all_terms
 
     def rename(self, renaming: Dict[str, str]) -> "Last":
         return Last(self.argument.rename(renaming))
@@ -240,106 +223,117 @@ class Last(Restriction):
     def __str__(self):
         return f"last({self.argument})"
 
+
 @dataclass
 class Comparison(Restriction):
     left: Term
     right: Term
 
-    def __eq__(self, other):
-        return type(self) == type(other) and (
-                self.left == other.left
-                and self.right == other.right)
-
-    @property
-    def variables(self) -> Set[Variable]:
-        return self.left.variables | self.right.variables
-
-    @property
-    def all_terms(self) -> Set[Term]:
-        return self.left.all_terms | self.right.all_terms
+    def __post_init__(self):
+        super().__post_init__()
+        self.comp_str: str = ""
+        self.variables: Set[Variable] = (self.left.variables
+                                         | self.right.variables)
+        self.all_terms: Set[Term] = (self.left.all_terms
+                                     | self.right.all_terms)
 
     def rename(self, renaming: Dict[str, str]) -> "Comparison":
         return type(self)(self.left.rename(renaming),
-                self.right.rename(renaming))
+                          self.right.rename(renaming))
 
     def __str__(self) -> str:
         return f"{self.left} {self.comp_str} {self.right}"
 
+    def __hash__(self):
+        return hash(self.left) & hash(self.right)
+
+    def __eq__(self, other) -> bool:
+        return (type(self) is type(other)
+                and self.left == other.left
+                and self.right == other.right)
+
+
 @dataclass
 class Less(Comparison):
-    @property
-    def comp_str(self):
-        return "<"
+    def __post_init__(self):
+        super().__post_init__()
+        self.comp_str: str = "<"
+
 
 @dataclass
 class LessEqual(Comparison):
-    @property
-    def comp_str(self):
-        return "<="
+    def __post_init__(self):
+        super().__post_init__()
+        self.comp_str: str = "<="
 
-@dataclass
-class Greater(Comparison):
-    @property
-    def comp_str(self):
-        return ">"
-
-@dataclass
-class GreaterEqual(Comparison):
-    @property
-    def comp_str(self):
-        return ">="
 
 @dataclass
 class Equal(Comparison):
-    @property
-    def comp_str(self):
-        return "="
+    def __post_init__(self):
+        super().__post_init__()
+        self.comp_str: str = "="
+
+    def __eq__(self, other) -> bool:
+        return (type(self) is type(other)
+                and ((self.left == other.left
+                      and self.right == other.right)
+                     or (self.left == other.right
+                         and self.right == other.left)))
+
 
 @dataclass
 class Unequal(Comparison):
-    @property
-    def comp_str(self):
-        return "~="
+    def __post_init__(self):
+        super().__post_init__()
+        self.comp_str: str = "~="
+
+    def __eq__(self, other) -> bool:
+        return (type(self) is type(other)
+                and ((self.left == other.left
+                      and self.right == other.right)
+                     or (self.left == other.right
+                         and self.right == other.left)))
+
 
 @dataclass
 class RestrictionCollection(Restriction):
-    restrictions: List[Restriction]
+    restrictions: Set[Restriction]
 
-    @property
-    def variables(self) -> Set[Variable]:
-        from functools import reduce
-        return set(reduce(
-            lambda acc, r: r.variables | acc,
-            self.restrictions,
-            set()))
-
-    @property
-    def all_terms(self) -> Set[Term]:
-        from functools import reduce
-        return set(reduce(
-            lambda acc, r: r.all_terms | acc,
-            self.restrictions,
-            set()))
+    def __post_init__(self):
+        super().__post_init__()
+        self.variables: Set[Variable] = set()
+        self.all_terms: Set[Term] = set()
+        self.comparison_symbol: str = ""
+        for r in self.restrictions:
+            self.variables |= r.variables
+            self.all_terms |= r.all_terms
 
     def rename(self, renaming) -> "RestrictionCollection":
-        return type(self)([r.rename(renaming) for r in self.restrictions])
+        return type(self)({r.rename(renaming) for r in self.restrictions})
 
     def __str__(self) -> str:
         restrictions = f" {self.comparison_symbol} ".join(
                 [str(r) for r in self.restrictions])
         return f"( {restrictions} )"
 
+
 @dataclass
 class RestrictionConjunction(RestrictionCollection):
-    @property
-    def comparison_symbol(self) -> str:
-        return "&"
+    def __post_init__(self):
+        self.comparison_symbol: str = "&"
+
+    def rename(self, renaming) -> "RestrictionConjunction":
+        return cast("RestrictionConjunction", super().rename(renaming))
+
 
 @dataclass
 class RestrictionDisjunction(RestrictionCollection):
-    @property
-    def comparison_symbol(self) -> str:
-        return "|"
+    def __post_init__(self):
+        self.comparison_symbol: str = "|"
+
+    def rename(self, renaming) -> "RestrictionDisjunction":
+        return cast("RestrictionDisjunction", super().rename(renaming))
+
 
 @dataclass
 class Broadcast(Formula):
@@ -354,50 +348,24 @@ class Broadcast(Formula):
         return Broadcast(variable, guard, body)
 
     def __post_init__(self):
-        # setup caching
-        self._free_variables = None
-        self._variables = None
-        self._all_terms = None
-        self._local_terms = None
-        for predicate in self.body.predicates:
-            if [self.variable] != predicate.involved_variables:
-                raise FormulaError(f"Broadcast variable mismatch")
-
-    @property
-    def local_variables(self) -> List[Variable]:
-        return [self.variable]
-
-    @property
-    def free_variables(self) -> Set[Variable]:
-        if self._free_variables: return self._free_variables
-        self._free_variables = self.guard.variables - {self.variable}
-        return self._free_variables
-
-    @property
-    def variables(self) -> Set[Variable]:
-        if self._variables: return self._variables
-        self._variables = self.guard.variables | {self.variable}
-        return self._variables
-
-    @property
-    def all_terms(self) -> Set[Term]:
-        if self._all_terms: return self._all_terms
-        terms = {self.variable}
-        terms |= self.guard.all_terms
-        terms |= self.body.all_terms
-        self._all_terms = terms
-        return self._all_terms
-
-    @property
-    def local_terms(self) -> List[Term]:
-        if self._local_terms: return self._local_terms
-        self._local_terms = [t for t in self.sorted_terms
-                if t.variables.issubset({self.variable}) and t.variables]
-        return self._local_terms
+        super().__post_init__()
+        self.local_variables: List[Variable] = [self.variable]
+        self.free_variables: Set[Variable] = (self.guard.variables
+                                              - {self.variable})
+        self.variables: Set[Variable] = self.guard.variables | {self.variable}
+        self.all_terms: Set[Term] = ({self.variable}
+                                     | self.guard.all_terms
+                                     | self.body.all_terms)
+        self.local_terms: Set[Term] = {t for t in self.sorted_terms
+                                       if t.variables == {self.variable}}
+        if any([[self.variable] != predicate.involved_variables
+                for predicate in self.body.predicate]):
+            raise FormulaError(f"Broadcast variable mismatch")
 
     def __str__(self):
         return "broadcasting {{ {variable}: {guard}. {body} }}".format(
                 variable=self.variable, guard=self.guard, body=self.body)
+
 
 @dataclass
 class Clause(Formula):
@@ -405,69 +373,59 @@ class Clause(Formula):
     ports: PredicateConjunction
     broadcasts: List[Broadcast]
 
-    @property
-    def free_variables(self) -> Set[Variable]:
-        free_local_variables = self.ports.variables | self.guard.variables
-        broadcast_variables = set()
-        for b in self.broadcasts:
-            broadcast_variables |= b.free_variables
-        return free_local_variables | broadcast_variables
-
-    @property
-    def local_variables(self) -> List[Variable]:
-        return self.sorted_free_variables
-
-    @property
-    def predicates(self) -> Set[Predicate]:
-        predicates = set()
-        predicates |= self.ports.predicates
-        for b in self.broadcasts:
-            predicates |= b.body.predicates
-        return predicates
-
-    @property
-    def sorted_free_variables(self) -> List[Variable]:
-        return [t for t in self.sorted_terms if t in self.free_variables]
-
-    @property
-    def variables(self) -> Set[Variable]:
-        local_variables = self.ports.variables | self.guard.variables
-        broadcast_variables = set()
-        for b in self.broadcasts:
-            broadcast_variables |= b.variables
-        return local_variables | broadcast_variables
+    # def normalize(self) -> "Clause":
+    #     # renaming process
+    #     renaming = {v.name: f"x{i}" for i, v in enumerate(self.free_variables)}
+    #     new_guard = self.guard.rename(renaming)
+    #     new_ports = self.ports.rename(renaming)
+    #     broadcasts = []
+    #     for i, b in enumerate(self.broadcasts):
+    #         renaming[b.variable.name] = f"x{len(self.free_variables) + i}"
+    #         broadcasts.append(b.rename(renaming))
+    #     self.broadcasts = broadcasts
+    #     # adding disequality constraint for free variables to broadcasts
+    #     for b in self.broadcasts:
+    #         for conjunct in b.guard.restrictions:
+    #             var = b.variable
+    #             disequalities = [Unequal(var, v)
+    #                              for v in self.free_variables
+    #                              if not
+    #                              (Unequal(var, v) in conjunct.restrictions
+    #                               or Unequal(v, var) in
+# conjunct.restrictions)]
+    #             conjunct.restrictions += disequalities
 
     def __post_init__(self):
-        # renaming process
-        renaming = {v.name: f"x{i}" for i, v in enumerate(self.free_variables)}
-        self.guard = self.guard.rename(renaming)
-        self.ports = self.ports.rename(renaming)
-        broadcasts = []
-        for i, b in enumerate(self.broadcasts):
-            renaming[b.variable.name] = f"x{len(self.free_variables) + i}"
-            broadcasts.append(b.rename(renaming))
-        self.broadcasts = broadcasts
-        # adding disequality constraint for free variables to broadcasts
+        super().__post_init__()
+        self.variables: Set[Variable] = (self.ports.variables
+                                         | self.guard.variables)
+        self.free_variables: Set[Variable] = (self.ports.variables
+                                              | self.guard.variables)
+        self.predicates: Set[Predicate] = self.ports.predicates
+        self.all_terms: Set[Term] = self.guard.all_terms | self.ports.all_terms
         for b in self.broadcasts:
-            for conjunct in b.guard.restrictions:
-                var = b.variable
-                disequalities = [Unequal(var, v)
-                            for v in self.free_variables
-                            if (not Unequal(var, v) in conjunct.restrictions
-                                or Unequal(v, var) in conjunct.restrictions)]
-                conjunct.restrictions += disequalities
-
-    @property
-    def all_terms(self) -> Set[Term]:
-        terms = self.guard.all_terms | self.ports.all_terms
-        for b in self.broadcasts:
-            terms |= b.all_terms
-        return terms
-
-    @property
-    def local_terms(self) -> List[Term]:
-        return [t for t in self.sorted_terms
-                if t.variables.issubset(self.free_variables)]
+            self.variables |= b.variables
+            self.free_variables |= b.free_variables
+            self.predicates |= b.body.predicates
+            self.all_terms |= b.all_terms
+        self.sorted_free_variables = [t for t in self.sorted_terms
+                                      if t in self.free_variables]
+        self.local_variables = self.sorted_free_variables
+        self.local_terms: Set[Term] = {t for t in self.sorted_terms
+                                       if t.variables.issubset(
+                                           self.free_variables)}
 
     def __str__(self):
         return f"Clause({self.guard}, {self.ports}, {self.broadcasts})"
+
+
+@dataclass
+class Interaction:
+    clauses: List[Clause]
+    system: System
+    assumptions: Dict[str, str]
+    properties: Dict[str, str]
+
+    @property
+    def property_names(self) -> List[str]:
+        return sorted(list(self.properties.keys()) + ["deadlock"])

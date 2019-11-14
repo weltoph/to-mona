@@ -1,6 +1,5 @@
 from typing import List, Set, Optional, Tuple, Dict
 from dataclasses import dataclass
-from formula import Clause
 from enum import Enum, unique
 
 class SystemDefinitionError(Exception):
@@ -73,13 +72,6 @@ class SystemAddition(Enum):
 @dataclass
 class System:
     components: List[Component]
-    interaction: List[Clause]
-    assumptions: Dict[str, str]
-    properties: Dict[str, str]
-
-    @property
-    def property_names(self) -> List[str]:
-        return sorted(list(self.properties.keys()) + ["deadlock"])
 
     def __post_init__(self):
         self.components_of_labels = {
@@ -90,13 +82,6 @@ class System:
         sum_of_labels = sum([c.number_of_labels for c in self.components])
         if len(all_labels) != sum_of_labels:
             raise SystemDefinitionError(f"Not disjoint labels in components!")
-        for clause in self.interaction:
-            for predicate in clause.predicates:
-                edge = self.edge_with_label(predicate.name)
-                if not edge:
-                    raise SystemDefinitionError(
-                            f"{predicate.name} unknown in system")
-                predicate.bind(*edge)
 
     @property
     def states(self) -> Set[str]:

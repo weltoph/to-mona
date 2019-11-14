@@ -53,7 +53,7 @@ Formula {
 
   # cancel out two agrees until at most one agree is left (if there are odd
   # agrees) or none (if there are even agrees)
-  i ~= j. swapToDisagree(i) & swapToDisagree(j);
+  i ~= j. swapToAgree(i) & swapToAgree(j);
 }
 
 assumption "Even" {
@@ -61,7 +61,7 @@ assumption "Even" {
 }
 
 assumption "end" {
-  "pred end(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 x: (0 <= x & x < n & ( x in agreed | x in disagreed ) & (all1 y: ((0 <= y & y < n & y ~= x) => y in disagreed))))"
+  "pred end(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 x: (0 <= x & x < n & ( x in agreed | x in disagreed ) & (all1 y: ((0 <= y & y < n & y ~= x) => y in agreed))))"
 }
 
 assumption "payingMaster" {
@@ -72,22 +72,14 @@ assumption "payingCryptographer" {
   "pred payingCryptographer(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 y : (0 <= y & y < n & (y in PH | y in PT)))"
 }
 
-assumption "oddAgreed" {
-  "pred oddAgreed(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 x: (0 <= x & x < n & x in agreed))"
+assumption "oddDisagreed" {
+  "pred oddDisagreed(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 x: (0 <= x & x < n & x in disagreed))"
 }
 
-property "payingMasterNEven" {
-  "n in Even & end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingMaster(FH, FT, PH, PT, init, agreed, disagreed, undecided) & oddAgreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
+property "MasterPaid" {
+  "end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingMaster(FH, FT, PH, PT, init, agreed, disagreed, undecided) & oddDisagreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
 }
 
-property "payingMasterNOdd" {
-  "n notin Even & end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingMaster(FH, FT, PH, PT, init, agreed, disagreed, undecided) & ~oddAgreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
-}
-
-property "payingCryptographerNEven" {
-  "n in Even & end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingCryptographer(FH, FT, PH, PT, init, agreed, disagreed, undecided) & ~oddAgreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
-}
-
-property "payingCryptographerNOdd" {
-  "n notin Even & end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingCryptographer(FH, FT, PH, PT, init, agreed, disagreed, undecided) & oddAgreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
+property "CryptographerPaid" {
+  "end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingCryptographer(FH, FT, PH, PT, init, agreed, disagreed, undecided) & ~oddDisagreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
 }
