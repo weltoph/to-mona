@@ -1,11 +1,11 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "24cb02df12f1d8496f61d46306f0392ab08a891a54dc45726bd4eceb325b68c3"
+            "sha256": "206d7ee0eb6de15708597467f095a3875b7a81f20162df827d4119914da32622"
         },
         "pipfile-spec": 6,
         "requires": {
-            "python_version": "3.7"
+            "python_version": "3.8"
         },
         "sources": [
             {
@@ -18,18 +18,18 @@
     "default": {
         "jinja2": {
             "hashes": [
-                "sha256:065c4f02ebe7f7cf559e49ee5a95fb800a9e4528727aec6f24402a5374c65013",
-                "sha256:14dd6caf1527abb21f08f86c784eac40853ba93edb79552aa1e4b8aef1b61c7b"
+                "sha256:74320bb91f31270f9551d46522e33af46a80c3d619f4a4bf42b3164d30b5911f",
+                "sha256:9fe95f19286cfefaa917656583d020be14e7859c6b0252588391e47db34527de"
             ],
             "index": "pypi",
-            "version": "==2.10.1"
+            "version": "==2.10.3"
         },
         "lark-parser": {
             "hashes": [
-                "sha256:3cc504f98dcfe8dbe747bbfe966dbe6f126ce4234402ed98147020843d52eda9"
+                "sha256:26215ebb157e6fb2ee74319aa4445b9f3b7e456e26be215ce19fdaaa901c20a4"
             ],
             "index": "pypi",
-            "version": "==0.7.7"
+            "version": "==0.7.8"
         },
         "markupsafe": {
             "hashes": [

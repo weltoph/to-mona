@@ -1,5 +1,7 @@
-from typing import List, Tuple, Dict, Optional, Union
+from typing import List, Tuple, Dict, Optional, Union, cast
 from dataclasses import dataclass
+
+VarStr = Union[str, "Variable"]
 
 import formula
 
@@ -52,7 +54,10 @@ class FormulaConstant(Formula):
     value: bool
 
     def render(self) -> str:
-        return "true" if self.value else "false"
+        if self.value:
+            return "true"
+        else:
+            return "false"
 
     def negate(self) -> "FormulaConstant":
         return FormulaConstant(not self.value)
@@ -60,6 +65,9 @@ class FormulaConstant(Formula):
 @dataclass
 class StatementChain(Formula):
     statements: List[Formula]
+
+    def __post_init__(self):
+        self.comp_symb = ""
 
     def render(self) -> str:
         new_lines = []
@@ -75,9 +83,8 @@ class StatementChain(Formula):
 
 @dataclass
 class Conjunction(StatementChain):
-    @property
-    def comp_symb(self) -> str:
-        return "&"
+    def __post_init__(self):
+        self.comp_symb = "&"
 
     def simplify(self):
         simplified = [s
@@ -104,9 +111,8 @@ class Conjunction(StatementChain):
 
 @dataclass
 class Disjunction(StatementChain):
-    @property
-    def comp_symb(self) -> str:
-        return "|"
+    def __post_init__(self):
+        self.comp_symb = "|"
 
     def simplify(self):
         simplified = [s
@@ -186,63 +192,68 @@ class Comparison(Atom):
                 else self.left)
         self.right = (Variable(self.right) if type(self.right) is str
                 else self.right)
+        self.comp_symb = ""
 
     def render(self) -> str:
         return f"{self.left.render()} {self.comp_symb} {self.right.render()}"
 
 @dataclass
 class Unequal(Comparison):
-    @property
-    def comp_symb(self) -> str:
-        return "~="
+    def __post_init__(self):
+        self.comp_symb = "~="
 
     def negate(self):
         return Equal(self.left, self.right)
 
 @dataclass
 class Equal(Comparison):
-    @property
-    def comp_symb(self) -> str:
-        return "="
+    def __post_init__(self):
+        self.comp_symb = "="
 
     def negate(self):
         return Unequal(self.left, self.right)
 
 @dataclass
 class Less(Comparison):
-    @property
-    def comp_symb(self) -> str:
-        return "<"
+    def __post_init__(self):
+        self.comp_symb = "<"
 
     def negate(self):
         return LessEqual(self.right, self.left)
 
 @dataclass
 class LessEqual(Comparison):
-    @property
-    def comp_symb(self) -> str:
-        return "<="
+    def __post_init__(self):
+        self.comp_symb = "<="
 
     def negate(self):
         return Less(self.right, self.left)
 
 
-@dataclass
+@dataclass(init=False)
 class Participation(Atom):
-    first_order: Union[Variable, str]
-    second_order: Union[Variable, str]
+    first_order: Variable
+    second_order: Variable
+
+    def __init__(self,
+                 first_order: Union[Variable, str],
+                 second_order: Union[Variable, str]):
+        if type(first_order) is str:
+            self.first_order = Variable(cast(str, first_order))
+        else:
+            self.first_order = cast(Variable, first_order)
+        if type(second_order) is str:
+            self.second_order = Variable(cast(str, second_order))
+        else:
+            self.second_order = cast(Variable, second_order)
 
     def __post_init__(self):
-        self.first_order = (
-                Variable(self.first_order) if type(self.first_order) is str
-                else self.first_order)
-        self.second_order = (
-                Variable(self.second_order) if type(self.second_order) is str
-                else self.second_order)
-
+        self.part_symb = ""
 
     def render(self) -> str:
-        return f"{self.first_order.render()} {self.part_symb} {self.second_order.render()}"
+        first = self.first_order.render()
+        second = self.second_order.render()
+        return f"{first} {self.part_symb} {second}"
 
 @dataclass
 class ElementIn(Participation):
@@ -262,36 +273,40 @@ class ElementNotIn(Participation):
     def negate(self):
         return ElementIn(self.first_order, self.second_order)
 
-@dataclass
+@dataclass(init=False)
 class PredicateCall(Atom):
     name: str
-    variables: Union[List[Union[Variable, str]], Union[Variable, str]]
+    parameters: List[Union[Variable, TermConstant]]
 
-    def __post_init__(self):
-        self.variables = (self.variables if type(self.variables) == list
-                else [self.variables])
-        self.variables = [
-                (Variable(v) if type(v) is str else v)
-                for v in self.variables]
+    def __init__(self, name: str,
+                 parameters: Union[List[VarStr], VarStr]):
+        self.name = name
+        if not type(self.parameters) is list:
+            parameters = cast(List[VarStr], [parameters])
+        self.parameters = [(Variable(cast(str, v)) if type(v) is str
+                           else cast(Variable, v))
+                          for v in self.parameters]
 
     def render(self) -> str:
-        variables = ", ".join([v.render() for v in self.variables])
-        return f"{self.name}({variables})"
+        parameters = ", ".join([v.render() for v in self.parameters])
+        return f"{self.name}({parameters})"
 
     def negate(self):
         return Negation(self)
 
-@dataclass
+@dataclass(init=False)
 class Quantification(Formula):
-    variables: Union[List[Union[Variable, str]], Union[Variable, str]]
+    variables: List[Variable]
     inner: Formula
 
-    def __post_init__(self):
-        self.variables = (self.variables if type(self.variables) is list
-                else [self.variables])
-        self.variables = [
-                (Variable(v) if type(v) is str else v)
-                for v in self.variables]
+    def __init__(self, variables: Union[List[VarStr], VarStr], inner: Formula):
+        if not type(self.variables) is list:
+            variables = cast(List[VarStr], [variables])
+        self.variables = [(Variable(cast(str, v)) if type(v) is str
+                           else cast(Variable, v))
+                          for v in self.variables]
+        self.kind: str = ""
+
 
     def render(self) -> str:
         inner = self._block_indent(self._actual_inner().render())
@@ -362,20 +377,25 @@ class UniversalFirstOrder(GuardedFirstOrderQuantification):
     def negate(self):
         return ExistentialFirstOrder(self.variables, self.inner.negate())
 
-@dataclass
+@dataclass(init=False)
 class PredicateDefinition(Formula):
     name: str
-    second_order: List[Union[Variable, str]]
-    first_order: List[Union[Variable, str]]
+    second_order: List[Variable]
+    first_order: List[Variable]
     inner: Formula
 
-    def __post_init__(self):
-        self.second_order = [
-                (Variable(v) if type(v) is str else v)
-                for v in self.second_order]
-        self.first_order = [
-                (Variable(v) if type(v) is str else v)
-                for v in self.first_order]
+    def __init__(self, name: str, second_order: Union[List[VarStr], VarStr],
+                 first_order: Union[List[VarStr], VarStr], inner: Formula):
+        self.name = name
+        if not type(second_order) is list:
+            second_order = cast(List[VarStr], [second_order])
+        self.second_order = [(Variable(cast(str, v)) if type(v) is str
+                              else cast(Variable, v))
+                             for v in self.second_order]
+        self.first_order = [(Variable(cast(str, v)) if type(v) is str
+                             else cast(Variable, v))
+                            for v in self.first_order]
+        self.inner = inner
 
     def render(self) -> str:
         inner = self._block_indent(self.inner.render())
@@ -386,33 +406,35 @@ class PredicateDefinition(Formula):
     def simplify(self):
         inner = self.inner.simplify()
         return PredicateDefinition(self.name, self.second_order,
-                self.first_order, inner)
+                                   self.first_order, inner)
 
-def translate_term(term: formula.Term) -> Term:
-    if type(term) is formula.Constant:
-        return TermConstant(term.value)
-    elif type(term) is formula.Variable:
-        return Variable(term.name)
+
+def translate_term(term: Union[formula.Variable,
+                               formula.Successor]) -> Variable:
+    if type(term) is formula.Variable:
+        return Variable(cast(formula.Variable, term).name)
     elif type(term) is formula.Successor:
-        current_term = term.argument
+        current_term = cast(formula.Successor, term).argument
         prefix = "succ_"
         while type(current_term) is formula.Successor:
             prefix += "succ_"
-            current_term = current_term.argument
+            current_term = cast(formula.Successor, current_term).argument
         if type(current_term) is formula.Constant:
+            current_term = cast(formula.Constant, current_term)
             return Variable(f"{prefix}{current_term.value}")
         elif type(current_term) is formula.Variable:
+            current_term = cast(formula.Variable, current_term)
             return Variable(f"{prefix}{current_term.name}")
-    else:
-        raise MonaError("Cannot translate {term} to ws1s")
+    raise MonaError("Cannot translate {term} to ws1s")
 
 def successor_constraint(succ: formula.Successor) -> PredicateCall:
-    term_var = translate_term(succ)
+    term_var = cast(Variable, translate_term(succ))
     argument_var = translate_term(succ.argument)
     return PredicateCall("is_next", [argument_var, term_var])
 
 def translate_formula(f: formula.Formula) -> Formula:
     if type(f) is formula.Last:
+        f = cast(formula.Last, f)
         argument = translate_term(f.argument)
         return PredicateCall("is_last", argument)
     elif type(f) is formula.Less:
@@ -458,19 +480,3 @@ def get_quantifiable_objects(statement:
     considered_terms = ([t for t in statement.local_terms if (not t.is_atomic)]
             + statement.local_variables)
     return [translate_term(t) for t in considered_terms]
-
-
-def call_mona(scriptfile: str) -> str:
-    from subprocess import run
-    result = run(f"mona -q {scriptfile}",
-            capture_output=True, shell=True, encoding="utf-8")
-    if result.returncode != 0:
-        msg = f"error executing {result.args}:\n{result.stdout}"
-        raise MonaError(msg)
-    return result.stdout
-
-def write_tmp_file(content: str) -> str:
-    from tempfile import NamedTemporaryFile
-    with NamedTemporaryFile(mode = "w", delete = False) as tmp_file:
-        print(content, file=tmp_file, flush=True)
-        return tmp_file.name

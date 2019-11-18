@@ -1,15 +1,17 @@
-from typing import List, Set, Optional, Tuple, Dict
+from typing import Set, Optional, Tuple, cast, FrozenSet
 from dataclasses import dataclass
 from enum import Enum, unique
+
 
 class SystemDefinitionError(Exception):
     pass
 
-@dataclass
+
+@dataclass(frozen=True)
 class Component:
     name: str
     initial_state: str
-    transitions: List[Tuple[str, str, str]]
+    transitions: FrozenSet[Tuple[str, str, str]]
 
     def __str__(self) -> str:
         return f"Component {self.name} {self.transitions}"
@@ -25,7 +27,8 @@ class Component:
             if self.initial_state == s:
                 found_initial = True
         if not found_initial:
-            raise SystemDefinitionError("initial state has no outgoing transition")
+            raise SystemDefinitionError(
+                    "initial state has no outgoing transition")
         for l in collection_by_label:
             transitions = collection_by_label[l]
             if len(transitions) != 1:
@@ -34,50 +37,59 @@ class Component:
             else:
                 collection_by_label[l] = transitions.pop()
         # TODO: maybe check for connectivity
-        self.transition_by_label = collection_by_label
-        self.states = sorted(list(states))
+        object.__setattr__(self, 'transition_by_label', collection_by_label)
+        object.__setattr__(self, 'states', sorted(list(states)))
 
     @property
     def number_of_states(self) -> int:
-        return len(self.states)
+        return len(self.states)  # type: ignore
 
     @property
     def labels(self) -> Set[str]:
-        return set(self.transition_by_label.keys())
+        return set(self.transition_by_label.keys())  # type: ignore
 
     @property
     def number_of_labels(self) -> int:
-        return len(self.labels)
+        return len(self.labels)  # type: ignore
 
     def edge_with_label(self, label: str) -> Optional[Tuple[str, str]]:
-        return self.transition_by_label.get(label, None)
+        return self.transition_by_label.get(label, None)  # type: ignore
 
     def source_of_label(self, label: str) -> Optional[str]:
-        try:
-            self.edge_with_label(label)[0]
-        except TypeError:
+        potential_edge = self.edge_with_label(label)
+        if potential_edge is not None:
+            edge = cast(Tuple[str, str], potential_edge)
+            return edge[0]
+        else:
             return None
 
     def target_of_label(self, label: str) -> Optional[str]:
-        try:
-            self.edge_with_label(label)[1]
-        except TypeError:
+        potential_edge = self.edge_with_label(label)
+        if potential_edge is not None:
+            edge = cast(Tuple[str, str], potential_edge)
+            return edge[1]
+        else:
             return None
+
 
 @unique
 class SystemAddition(Enum):
     PROPERTY = "property"
     ASSUMPTION = "assumption"
 
-@dataclass
+
+@dataclass(frozen=True)
 class System:
-    components: List[Component]
+    components: FrozenSet[Component]
 
     def __post_init__(self):
-        self.components_of_labels = {
-                l: c for c in self.components
-                     for l in c.labels
+        components_of_labels = {
+                l: c
+                for c in self.components
+                for l in c.labels
             }
+        object.__setattr__(self, 'components_of_labels',
+                           components_of_labels)
         all_labels = set(self.components_of_labels.keys())
         sum_of_labels = sum([c.number_of_labels for c in self.components])
         if len(all_labels) != sum_of_labels:
@@ -85,11 +97,12 @@ class System:
 
     @property
     def states(self) -> Set[str]:
-        return sum([c.states for c in self.components], [])
+        return set(sum([c.states for c in self.components],  # type: ignore
+                       []))
 
     def edge_with_label(self, label: str) -> Optional[Tuple[str, str]]:
         try:
-            component = self.components_of_labels[label]
+            component = self.components_of_labels[label]  # type: ignore
             return component.edge_with_label(label)
         except KeyError:
             return None
