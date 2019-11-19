@@ -4,6 +4,8 @@ from parser import parse_file
 import argparse
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 def write_tmp_file(content: str) -> str:
     from tempfile import NamedTemporaryFile
@@ -58,7 +60,29 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
 
     for filename in args.file:
-        parse_file(filename).normalize()
+        n_interaction = parse_file(filename).normalize()
+        logger.info("rendering base theory")
+        base_theory = n_interaction.render_base_theory()
+        for property_name in n_interaction.property_names:
+            logger.info(f"checking {property_name}")
+            proof_script = n_interaction.render_property_unreachability(
+                    property_name,
+                    base_theory)
+            proof_file = write_tmp_file(proof_script)
+            logger.info(f"writing proof script to {proof_file}")
+            try:
+                logger.info("calling mona")
+                result = call_mona(proof_file)
+            except ChildProcessError as e:
+                logger.warning(f"mona reported error {e}")
+                continue
+            if "Formula is unsatisfiable" in result:
+                if verbosity > 0:
+                    print(f"{filename}: Successfully proven unreachability of "
+                          + str(property_name))
+            else:
+                print(f"{filename}: Unable to prove unreachability of "
+                      + str(property_name))
 
 
 if __name__ == "__main__":

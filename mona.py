@@ -1,4 +1,4 @@
-from typing import List, Union, cast
+from typing import List, Union
 from dataclasses import dataclass
 
 VarStr = Union[str, "Variable"]
@@ -244,25 +244,14 @@ class LessEqual(Comparison):
         return Less(self.right, self.left)
 
 
-@dataclass(init=False)
+@dataclass()
 class Participation(Atom):
     first_order: Variable
     second_order: Variable
 
-    def __init__(self,
-                 first_order: Union[Variable, str],
-                 second_order: Union[Variable, str]):
-        if type(first_order) is str:
-            self.first_order = Variable(cast(str, first_order))
-        else:
-            self.first_order = cast(Variable, first_order)
-        if type(second_order) is str:
-            self.second_order = Variable(cast(str, second_order))
-        else:
-            self.second_order = cast(Variable, second_order)
-
-    def __post_init__(self):
-        self.part_symb = ""
+    @property
+    def part_symb(self) -> str:
+        raise NotImplementedError()
 
     def render(self) -> str:
         first = self.first_order.render()
@@ -290,19 +279,10 @@ class ElementNotIn(Participation):
         return ElementIn(self.first_order, self.second_order)
 
 
-@dataclass(init=False)
+@dataclass()
 class PredicateCall(Atom):
     name: str
-    parameters: List[Union[Variable, TermConstant]]
-
-    def __init__(self, name: str,
-                 parameters: Union[List[VarStr], VarStr]):
-        self.name = name
-        if not type(self.parameters) is list:
-            parameters = cast(List[VarStr], [parameters])
-        self.parameters = [(Variable(cast(str, v)) if type(v) is str
-                           else cast(Variable, v))
-                           for v in self.parameters]
+    parameters: List[Variable]
 
     def render(self) -> str:
         parameters = ", ".join([v.render() for v in self.parameters])
@@ -312,18 +292,13 @@ class PredicateCall(Atom):
         return Negation(self)
 
 
-@dataclass(init=False)
+@dataclass()
 class Quantification(Formula):
     variables: List[Variable]
     inner: Formula
 
-    def __init__(self, variables: Union[List[VarStr], VarStr], inner: Formula):
-        if not type(self.variables) is list:
-            variables = cast(List[VarStr], [variables])
-        self.variables = [(Variable(cast(str, v)) if type(v) is str
-                           else cast(Variable, v))
-                          for v in self.variables]
-        self.kind: str = ""
+    def __post_init__(self):
+        self.kind = ""
 
     def render(self) -> str:
         inner = self._block_indent(self._actual_inner().render())
@@ -400,25 +375,12 @@ class UniversalFirstOrder(GuardedFirstOrderQuantification):
         return ExistentialFirstOrder(self.variables, self.inner.negate())
 
 
-@dataclass(init=False)
+@dataclass()
 class PredicateDefinition(Formula):
     name: str
     second_order: List[Variable]
     first_order: List[Variable]
     inner: Formula
-
-    def __init__(self, name: str, second_order: Union[List[VarStr], VarStr],
-                 first_order: Union[List[VarStr], VarStr], inner: Formula):
-        self.name = name
-        if not type(second_order) is list:
-            second_order = cast(List[VarStr], [second_order])
-        self.second_order = [(Variable(cast(str, v)) if type(v) is str
-                              else cast(Variable, v))
-                             for v in self.second_order]
-        self.first_order = [(Variable(cast(str, v)) if type(v) is str
-                             else cast(Variable, v))
-                            for v in self.first_order]
-        self.inner = inner
 
     def render(self) -> str:
         inner = self._block_indent(self.inner.render())

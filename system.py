@@ -1,6 +1,8 @@
-from typing import Set, Optional, Tuple, cast, FrozenSet
+from typing import Set, Optional, Tuple, cast, FrozenSet, List
 from dataclasses import dataclass
 from enum import Enum, unique
+
+import mona
 
 
 class SystemDefinitionError(Exception):
@@ -39,6 +41,10 @@ class Component:
         # TODO: maybe check for connectivity
         object.__setattr__(self, 'transition_by_label', collection_by_label)
         object.__setattr__(self, 'states', sorted(list(states)))
+
+    @property
+    def state_variables(self) -> List[mona.Variable]:
+        return sorted([mona.Variable(s) for s in self.states], key=str)  # type: ignore attr-defined  # noqa: E501, F723
 
     @property
     def number_of_states(self) -> int:
@@ -99,6 +105,10 @@ class System:
     def states(self) -> Set[str]:
         return set(sum([c.states for c in self.components],  # type: ignore
                        []))
+
+    @property
+    def state_variables(self) -> List[mona.Variable]:
+        return sorted([mona.Variable(s) for s in self.states], key=str)
 
     def edge_with_label(self, label: str) -> Optional[Tuple[str, str]]:
         try:

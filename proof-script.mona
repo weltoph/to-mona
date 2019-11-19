@@ -1,9 +1,9 @@
 {{ base_theory }}
 
-{% for s in system.states %}
-var2 {{ s }};
+{% for v in interaction.system.state_variables %}
+var2 {{ v.render() }};
 {% endfor %}
 
-{{ marking_predicate_call(system.states) }};
+{{ interaction.marking_predicate_call().render() }};
 
-{{ render_property_check(system.states, property_name) }};
+{{ interaction.property_check(property_name).render() }};

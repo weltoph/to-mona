@@ -14,60 +14,60 @@ pred is_last(var1 last) = (
   last + 1 = n
 );
 
-{% for name, assumption in system.assumptions.items() %}
+{% for name, assumption in interaction.assumptions.items() %}
 /* custom assumption {{ name }} */
 {{ assumption }};
 {% endfor %}
 
 /* define an intersection between two sets */
-{{ intersection_predicate(system) }}
+{{ interaction.intersection_predicate().render() }}
 
 /* define a unique intersection between two sets */
-{{ unique_intersection_predicate(system) }}
+{{ interaction.unique_intersection_predicate().render() }}
 
 /* define an intersection with the initial marking */
-{{ intersects_initial_predicate(system) }}
+{{ interaction.intersects_initial_predicate().render() }}
 
 /* define a unique intersection with the initial marking */
-{{ uniquely_intersects_initial_predicate(system) }}
+{{ interaction.uniquely_intersects_initial_predicate().render() }}
 
 /* define transition predicates: */
-{% for clause in system.interaction %}
+{% for clause in interaction.clauses %}
 /* introduce predicate to describe deadlock of {{ clause }} */
-{{ transition_dead_predicate(system, clause, loop.index) }}
+{{ clause.is_dead_predicate(loop.index).render() }}
 
 /* introduce predicate to describe trap condition of {{ clause }} */
-{{ transition_trap_predicate(system, clause, loop.index) }}
+{{ clause.trap_predicate(loop.index).render() }}
 
 /* introduce predicate to describe flow invariant condition of {{ clause }} */
-{{ transition_invariant_predicate(system, clause, loop.index) }}
+{{ clause.invariant_predicate(loop.index).render() }}
 {% endfor %}
 
 /* predicate to describe a deadlock */
-{{ deadlock_predicate(system) }}
+{{ interaction.deadlock_predicate().render() }}
 
 /* predicate to describe a trap */
-{{ trap_predicate(system) }}
+{{ interaction.trap_predicate().render() }}
 
 /* predicate to describe an initially marked trap */
-{{ initially_marked_trap_predicate(system) }}
+{{ interaction.initially_marked_trap_predicate().render() }}
 
 /* predicate to describe a flow invariant */
-{{ invariant_predicate(system) }}
+{{ interaction.invariant_predicate().render() }}
 
 /* predicate to describe an initially uniquely marked flow invariant */
-{{ initially_uniquely_marked_flow_predicate(system) }}
+{{ interaction.initially_uniquely_marked_flow_predicate().render() }}
 
 /* invariant that every initially marked trap has to be marked by any marking */
-{{ trap_invariant_predicate(system) }}
+{{ interaction.trap_invariant_predicate().render() }}
 
 /* invariant that every initially uniquely marked flow has to be marked by precisely one place by any marking */
-{{ flow_invariant_predicate(system) }}
+{{ interaction.flow_invariant_predicate().render() }}
 
 /* predicate to capture valid markings */
-{{ marking_predicate(system) }}
+{{ interaction.marking_predicate().render() }}
 
-{% for name, formula in system.properties.items() %}
+{% for name, formula in interaction.properties.items() %}
 /* custom property */
-{{ render_property(system, name, formula) }}
+{{ interaction.custom_property(name, formula).render() }}
 {% endfor %}
