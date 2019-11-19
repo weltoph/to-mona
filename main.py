@@ -29,13 +29,13 @@ def main():
                         help="file to be processed",
                         nargs="+")
 
-    parser.add_argument("-d",
+    parser.add_argument("-v",
                         help=("increases debug output level"
                               + " " + "(can be specified more than once)"),
                         action="count",
                         default=0)
 
-    parser.add_argument("-v",
+    parser.add_argument("-q",
                         help=("decreases debug output level"
                               + " " + "(can be specified more than once)"),
                         action="count",
@@ -43,18 +43,18 @@ def main():
 
     args = parser.parse_args()
 
-    verbosity = 3 + args.v - args.d
-    verbosity = min(0, max(verbosity, 4))
+    verbosity = 2 + args.v - args.q
+    verbosity = max(0, min(verbosity, 4))
 
-    if args.d == 0:
+    if verbosity == 0:
         logging.basicConfig(level=logging.CRITICAL)
-    elif args.d == 1:
+    elif verbosity == 1:
         logging.basicConfig(level=logging.ERROR)
-    elif args.d == 2:
+    elif verbosity == 2:
         logging.basicConfig(level=logging.WARNING)
-    elif args.d == 3:
+    elif verbosity == 3:
         logging.basicConfig(level=logging.INFO)
-    elif args.d == 4:
+    elif verbosity == 4:
         logging.basicConfig(level=logging.DEBUG)
 
     for filename in args.file:

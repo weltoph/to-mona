@@ -6,6 +6,8 @@ from system import System
 
 import logging
 
+import mona
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,12 +74,6 @@ class Constant(Term):
                             r_var, Constant(self.system, self.value))
         return ({restriction}, r_var)
 
-    def __hash__(self):
-        return hash(self.value)
-
-    def __eq__(self, other):
-        return type(self) == type(other) and self.value == other.value
-
     def __str__(self):
         return str(self.value)
 
@@ -105,12 +101,6 @@ class Variable(Term):
                                f" {self}")
         return (set(), r_var)
 
-    def __hash__(self):
-        return hash(self.name)
-
-    def __eq__(self, other):
-        return type(self) == type(other) and self.name == other.name
-
     def __str__(self):
         return self.name
 
@@ -132,13 +122,6 @@ class Successor(Term):
         new_variable = Variable(self.system, f"succ_{argument.name}")
         new_restriction = IsNext(self.system, argument, new_variable)
         return (restrictions | {new_restriction}, new_variable)
-
-    def __hash__(self):
-        return hash("succ") & hash(self.argument)
-
-    def __eq__(self, other):
-        return (type(self) == type(other) and
-                self.argument == other.argument)
 
     def substitute(self, substitution: Dict["Term", "Variable"]) -> "Variable":
         try:
@@ -163,14 +146,6 @@ class Predicate(Formula):
         all_terms: Set[Term] = self.argument.all_terms
         object.__setattr__(self, 'variables', variables)
         object.__setattr__(self, 'all_terms', all_terms)
-
-    def __hash__(self):
-        return hash(self.name) & hash(self.argument)
-
-    def __eq__(self, other):
-        return (type(self) == type(other)
-                and self.name == other.name
-                and self.argument == other.argument)
 
     def substitute(self,
                    substitution: Dict["Term", "Variable"]) -> "Predicate":
@@ -247,12 +222,6 @@ class Restriction(Formula):
 class Last(Restriction):
     argument: Term
 
-    def __hash__(self):
-        return hash("last") & hash(self.argument)
-
-    def __eq__(self, other):
-        return type(self) is type(other) and self.argument == other.argument
-
     def __post_init__(self):
         super().__post_init__()
         variables: Set[Variable] = self.argument.variables
@@ -265,6 +234,10 @@ class Last(Restriction):
 
     def __str__(self):
         return f"last({self.argument})"
+
+    def as_mona(self):
+        argument = self.argument.as_mona
+        return mona.PredicateCall("is_last", argument)
 
 
 @dataclass(frozen=True)
@@ -303,6 +276,11 @@ class IsNext(Comparison):
     def __str__(self) -> str:
         return f"is_next({self.left}, {self.right})"
 
+    def as_mona(self):
+        left = self.left.as_mona()
+        right = self.right.as_mona()
+        return PredicateCall("is_next", [left, right])
+
 
 @dataclass(frozen=True)
 class Less(Comparison):
@@ -310,12 +288,22 @@ class Less(Comparison):
         super().__post_init__()
         object.__setattr__(self, 'comp_str', "<")
 
+    def as_mona(self):
+        left = self.left.as_mona()
+        right = self.right.as_mona()
+        return mona.Less(left, right)
+
 
 @dataclass(frozen=True)
 class LessEqual(Comparison):
     def __post_init__(self):
         super().__post_init__()
         object.__setattr__(self, 'comp_str', "<=")
+
+    def as_mona(self):
+        left = self.left.as_mona()
+        right = self.right.as_mona()
+        return mona.LessEqual(left, right)
 
 
 @dataclass(frozen=True)
@@ -334,6 +322,11 @@ class Equal(Comparison):
     def __hash__(self):
         return hash(self.left) & hash(self.right)
 
+    def as_mona(self):
+        left = self.left.as_mona()
+        right = self.right.as_mona()
+        return mona.Equal(left, right)
+
 
 @dataclass(frozen=True)
 class Unequal(Comparison):
@@ -350,6 +343,11 @@ class Unequal(Comparison):
 
     def __hash__(self):
         return hash(self.left) & hash(self.right)
+
+    def as_mona(self):
+        left = self.left.as_mona()
+        right = self.right.as_mona()
+        return mona.Unequal(left, right)
 
 
 @dataclass(frozen=True)
@@ -384,6 +382,12 @@ class Broadcast(Formula):
     guard: RestrictionCollection  # DNF
     body: PredicateDisjunction
     quantified_variables: Set[Variable] = field(default_factory=set)
+
+    def guard_as_mona(self):
+        return mona.Disjunction([
+                mona.Conjunction([
+                    f.as_mona() for f in c.restrictions])
+                for c in self.guard.restrictions])
 
     def _substitute_elements(self, substitution: Dict["Term", "Variable"]
                              ) -> Tuple[Variable,
@@ -430,7 +434,7 @@ class Broadcast(Formula):
         new_guard = RestrictionCollection(self.system,
                                           frozenset(new_guard_clauses))
         n_broadcast = Broadcast(self.system, var, new_guard, body, q_vars)
-        logger.info(f"Normalized {self} to {n_broadcast}")
+        logger.debug(f"Normalized\n\t{self}\nto\n\t{n_broadcast}")
         return n_broadcast
 
     def __post_init__(self):
@@ -452,8 +456,11 @@ class Broadcast(Formula):
         object.__setattr__(self, 'free_variables', free_variables)
 
     def __str__(self):
-        return "broadcasting {{ {variable}: {guard}. {body} }}".format(
-                variable=self.variable, guard=self.guard, body=self.body)
+        return "broadcasting {{ {variables}: {guard}. {body} }}".format(
+                variables=", ".join([str(v)
+                                     for v in self.quantified_variables]),
+                guard=self.guard,
+                body=self.body)
 
 
 @dataclass(frozen=True)
@@ -461,6 +468,9 @@ class Clause(Formula):
     guard: RestrictionCollection  # Conjunction of Atoms
     ports: PredicateConjunction
     broadcasts: List[Broadcast]
+
+    def guard_as_mona(self):
+        return mona.Conjunction([c.as_mona() for c in self.guard.restrictions])
 
     def __post_init__(self):
         super().__post_init__()
@@ -496,7 +506,7 @@ class Clause(Formula):
         broadcasts = "\n\t".join([str(b) for b in self.broadcasts])
         return f"{guard}. {ports} {broadcasts}"
 
-    def normalize(self) -> "Clause":
+    def normalize_terms(self) -> "Clause":
         local_constant_terms = {t for t in self.all_terms  # type: ignore attr-defined # noqa: E501, F723
                                 if t.variables.issubset(self.free_variables)}  # type: ignore attr-defined # noqa: E501, F723
         sorted_vars = sorted([v for v in self.free_variables])  # type: ignore attr-defined # noqa: E501, F723
@@ -511,16 +521,72 @@ class Clause(Formula):
         renaming.update(term_substitions)
         broadcasts = []
         for j, broadcast in enumerate(self.broadcasts):
-            replacement_variable = Variable(self.system, f"b{j}")
+            replacement_variable = Variable(self.system, f"b_{j}")
             renaming[broadcast.variable] = replacement_variable
             n_broadcast = broadcast.normalize(renaming)
-            # n_broadcast = n_broadcast.substitute(renaming)
             broadcasts.append(n_broadcast)
         new_guard = RestrictionCollection(
                 self.system, self.guard.restrictions | all_restrictions)
         new_ports = self.ports.substitute(renaming)
         n_clause = Clause(self.system, new_guard, new_ports, broadcasts)
-        logger.info(f"Normalized {self} to {n_clause}")
+        logger.info(f"Normalized terms in\n\t{self}\nto\n\t{n_clause}")
+        return n_clause
+
+    def check_type_consistency(self) -> "Clause":
+        free_types = {p.argument: self.system.components_of_labels[p.name]  # type: ignore attr-defined # noqa: E501, F723
+                      for p in self.ports.predicates}
+        broadcast_types = {j: {self.system.components_of_labels[p.name]  # type: ignore attr-defined # noqa: E501, F723
+                               for p in b.body.predicates}
+                           for j, b in enumerate(self.broadcasts)}
+        for j in broadcast_types:
+            if len(labels := broadcast_types[j]) != 1:  # noqa: E203, E231
+                b = self.broadcasts[j]
+                raise FormulaError(f"Inconsistent types in {b}")
+            else:
+                broadcast_types[j] = labels.pop()
+        new_broadcasts: List[Broadcast] = []
+        for j, bc in broadcast_types.items():
+            broadcast = self.broadcasts[j]
+            gathered_restrictions: Set[Restriction] = set()
+            for v, fc in free_types.items():
+                new_restrictions: Set[Restriction] = set()
+                if fc != bc:
+                    continue
+                else:
+                    potential_restrictions: Set[Restriction] = {
+                            Unequal(self.system, v, o)
+                            for o in broadcast.quantified_variables}
+                    for conjunct in broadcast.guard.restrictions:
+                        conjunct = cast(RestrictionCollection, conjunct)
+                        if not potential_restrictions.issubset(
+                                conjunct.restrictions):
+                            new_restrictions = potential_restrictions
+                            logger.warning(f"{broadcast} might shadow {v}")
+                            logger.warning(f"adding {new_restrictions}")
+                            break
+                        else:
+                            continue
+                gathered_restrictions |= new_restrictions
+            new_guards: Set[RestrictionCollection] = set()
+            for restriction in broadcast.guard.restrictions:
+                restriction = cast(RestrictionCollection, restriction)
+                new_guards.add(RestrictionCollection(
+                    self.system, frozenset(restriction.restrictions
+                                           | gathered_restrictions)))
+            new_guard = RestrictionCollection(self.system,
+                                              frozenset(new_guards))
+            new_broadcasts.append(Broadcast(self.system,
+                                            broadcast.variable,
+                                            new_guard,
+                                            broadcast.body,
+                                            broadcast.quantified_variables))
+        n_clause = Clause(self.system, self.guard, self.ports, new_broadcasts)
+        logger.info(f"Normalized\n\t{self}\nto\n\t{n_clause}")
+        return n_clause
+
+    def normalize(self) -> "Clause":
+        n_clause = self.normalize_terms()
+        n_clause = n_clause.check_type_consistency()
         return n_clause
 
 
