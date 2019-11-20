@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
 
 from typing import List, Set, Dict, cast, Tuple, FrozenSet, Optional, Union
+from typing import Generic, TypeVar
 
-from system import System
+from system import System, Component
 
 import logging
 
@@ -31,11 +32,21 @@ class FormulaBase:
     def __post_init__(self):
         variables: Set["Variable"] = set()
         all_terms: Set["Term"] = set()
-        object.__setattr__(self, 'variables', variables)
-        object.__setattr__(self, 'all_terms', all_terms)
+        object.__setattr__(self, '_variables', variables)
+        object.__setattr__(self, '_all_terms', all_terms)
 
-    def substitute(self,
-                   substitution: Dict["Term", "Variable"]) -> "FormulaBase":
+    @property
+    def variables(self):
+        return self._variables
+
+    @property
+    def all_terms(self):
+        return self._all_terms
+
+    def normalize(self,
+                  substitution: Dict["Variable",
+                                     "Variable"]
+                  ) -> "FormulaBase":
         raise NotImplementedError()
 
 
@@ -48,18 +59,24 @@ class Term(FormulaBase):
     def __post_init__(self):
         super().__post_init__()
         all_terms: Set["Term"] = {self}
-        object.__setattr__(self, 'all_terms', all_terms)
+        object.__setattr__(self, '_all_terms', all_terms)
 
     def as_mona(self) -> mona.Term:
         raise NotImplementedError()
 
-    def substitute(self, substitution: Dict["Term", "Variable"]
-                   ) -> Union["Constant", "Variable"]:
+    def normalize(self,
+                  substitution: Dict["Variable",
+                                     "Variable"]
+                  ) -> "Variable":
+        return self.to_variable(substitution)
+
+    def to_variable(self, substitution: Dict["Variable", "Variable"]
+                    ) -> "Variable":
         raise NotImplementedError()
 
-    def term_normalization(self,
-                           variable_substitution: Dict["Term", "Variable"]
-                           ) -> Tuple[Set["Restriction"], "Variable"]:
+    def normalizing_restrictions(self, substitution: Dict["Variable",
+                                                          "Variable"]
+                                 ) -> Set["AtomicRestriction"]:
         raise NotImplementedError()
 
     def __lt__(self, other: "Term") -> bool:
@@ -70,20 +87,15 @@ class Term(FormulaBase):
 class Constant(Term):
     value: int
 
-    def substitute(self, substitution: Dict["Term", "Variable"]
-                   ) -> Union["Variable", "Constant"]:
-        try:
-            return substitution[self]
-        except KeyError:
-            return Constant(self.system, self.value)
+    def to_variable(self, substitution: Dict["Variable", "Variable"]
+                    ) -> "Variable":
+        return Variable(self.system, f"c_{self.value}")
 
-    def term_normalization(self,
-                           variable_substitution: Dict["Term", "Variable"]
-                           ) -> Tuple[Set["Restriction"], "Variable"]:
-        r_var = Variable(self.system, f"c_{self.value}")
-        restriction = Equal(self.system,
-                            r_var, Constant(self.system, self.value))
-        return ({restriction}, r_var)
+    def normalizing_restrictions(self, substitution: Dict["Variable",
+                                                          "Variable"]
+                                 ) -> Set["AtomicRestriction"]:
+        return {Equal(self.system, self.to_variable(substitution),
+                      Constant(self.system, self.value))}
 
     def __str__(self):
         return str(self.value)
@@ -99,21 +111,17 @@ class Variable(Term):
     def __post_init__(self):
         super().__post_init__()
         variables: Set["Variable"] = {self}
-        object.__setattr__(self, 'variables', variables)
+        object.__setattr__(self, '_variables', variables)
 
-    def substitute(self, substitution: Dict["Term", "Variable"]) -> "Variable":
-        equiv_var = Variable(self.system, self.name)
-        return substitution.get(self, equiv_var)
+    def to_variable(self, substitution: Dict["Variable", "Variable"]
+                    ) -> "Variable":
+        copy = Variable(self.system, self.name)
+        return substitution.get(self, copy)
 
-    def term_normalization(self,
-                           variable_substitution: Dict["Term", "Variable"]
-                           ) -> Tuple[Set["Restriction"], "Variable"]:
-        try:
-            r_var = variable_substitution[self]
-        except KeyError:
-            raise FormulaError(f"{variable_substitution} does not account for",
-                               f" {self}")
-        return (set(), r_var)
+    def normalizing_restrictions(self, substitution: Dict["Variable",
+                                                          "Variable"]
+                                 ) -> Set["AtomicRestriction"]:
+        return set()
 
     def __str__(self):
         return self.name
@@ -128,23 +136,25 @@ class Successor(Term):
 
     def __post_init__(self):
         super().__post_init__()
+        all_terms: Set["Term"] = self.argument.all_terms | {self}
         variables: Set["Variable"] = self.argument.variables
-        object.__setattr__(self, 'variables', variables)
+        object.__setattr__(self, '_variables', variables)
+        object.__setattr__(self, '_all_terms', all_terms)
 
-    def term_normalization(self,
-                           variable_substitution: Dict["Term", "Variable"]
-                           ) -> Tuple[Set["Restriction"], "Variable"]:
-        restrictions, argument = self.argument.term_normalization(
-                variable_substitution)
-        new_variable = Variable(self.system, f"succ_{argument.name}")
-        new_restriction = IsNext(self.system, argument, new_variable)
-        return (restrictions | {new_restriction}, new_variable)
+    def to_variable(self, substitution: Dict["Variable", "Variable"]
+                    ) -> "Variable":
+        argument = self.argument.to_variable(substitution)
+        variable = Variable(self.system, f"succ_{argument.name}")
+        return variable
 
-    def substitute(self, substitution: Dict["Term", "Variable"]) -> "Variable":
-        try:
-            return substitution[self]
-        except KeyError:
-            raise FormulaError(f"{substitution} does not account for {self}")
+    def normalizing_restrictions(self, substitution: Dict["Variable",
+                                                          "Variable"]
+                                 ) -> Set["AtomicRestriction"]:
+        restrictions = self.argument.normalizing_restrictions(substitution)
+        argument = self.argument.to_variable(substitution)
+        variable = self.to_variable(substitution)
+        new_restriction = IsNext(self.system, argument, variable)
+        return {new_restriction} | restrictions
 
     def __str__(self) -> str:
         return f"succ({self.argument})"
@@ -197,13 +207,15 @@ class Predicate(Formula):
         super().__post_init__()
         variables: Set[Variable] = self.argument.variables
         all_terms: Set[Term] = self.argument.all_terms
-        object.__setattr__(self, 'variables', variables)
-        object.__setattr__(self, 'all_terms', all_terms)
+        object.__setattr__(self, '_variables', variables)
+        object.__setattr__(self, '_all_terms', all_terms)
 
-    def substitute(self,
-                   substitution: Dict["Term", "Variable"]) -> "Predicate":
+    def normalize(self,
+                  substitution: Dict["Variable",
+                                     "Variable"]
+                  ) -> "Predicate":
         new_pred = Predicate(self.system, self.name,
-                             self.argument.substitute(substitution),
+                             self.argument.normalize(substitution),
                              self.pre, self.post)
         return new_pred
 
@@ -222,54 +234,31 @@ class PredicateCollection(Formula):
         for p in self.predicates:
             variables |= p.variables
             all_terms |= p.all_terms
-        object.__setattr__(self, 'variables', variables)
-        object.__setattr__(self, 'all_terms', all_terms)
+        object.__setattr__(self, '_variables', variables)
+        object.__setattr__(self, '_all_terms', all_terms)
 
-    def substitute(self,
-                   substitution: Dict["Term",
-                                      "Variable"]) -> "PredicateCollection":
+    def normalize(self,
+                  substitution: Dict["Variable",
+                                     "Variable"]
+                  ) -> "PredicateCollection":
         return type(self)(self.system,
-                          frozenset({p.substitute(substitution)
+                          frozenset({p.normalize(substitution)
                                      for p in self.predicates}))
 
-
-@dataclass(frozen=True)
-class PredicateConjunction(PredicateCollection):
-    def __post_init__(self):
-        super().__post_init__()
-
-    def substitute(self,
-                   substitution: Dict["Term",
-                                      "Variable"]) -> "PredicateConjunction":
-        return cast("PredicateConjunction", super().substitute(substitution))
-
     def __str__(self) -> str:
-        return f" & ".join([str(p) for  # type: ignore attr-defined # noqa: E501, F723
-                            p in self.predicates])
+        return ", ".join([str(p) for p in sorted(self.predicates, key=str)])
 
 
-@dataclass(frozen=True)
-class PredicateDisjunction(PredicateCollection):
-    def __post_init__(self):
-        super().__post_init__()
-        object.__setattr__(self, 'comparision_symbol', "|")
-
-    def substitute(self,
-                   substitution: Dict["Term",
-                                      "Variable"]) -> "PredicateDisjunction":
-        return cast("PredicateDisjunction", super().substitute(substitution))
-
-    def __str__(self) -> str:
-        return f" | ".join([str(p) for  # type: ignore attr-defined # noqa: E501, F723
-                            p in self.predicates])
+AtomicRestriction = Union["Equal",
+                          "Unequal",
+                          "Less",
+                          "LessEqual",
+                          "Last",
+                          "IsNext"]
 
 
 @dataclass(frozen=True)
 class Restriction(Formula):
-    def substitute(self,
-                   substitution: Dict["Term", "Variable"]) -> "Restriction":
-        raise NotImplementedError()
-
     def as_mona(self) -> mona.Formula:
         raise NotImplementedError()
 
@@ -282,11 +271,14 @@ class Last(Restriction):
         super().__post_init__()
         variables: Set[Variable] = self.argument.variables
         all_terms: Set[Term] = self.argument.all_terms
-        object.__setattr__(self, 'all_terms', all_terms)
-        object.__setattr__(self, 'variables', variables)
+        object.__setattr__(self, '_all_terms', all_terms)
+        object.__setattr__(self, '_variables', variables)
 
-    def substitute(self, substitution: Dict["Term", "Variable"]) -> "Last":
-        return Last(self.system, self.argument.substitute(substitution))
+    def normalize(self,
+                  substitution: Dict["Variable",
+                                     "Variable"]
+                  ) -> "Last":
+        return Last(self.system, self.argument.normalize(substitution))
 
     def __str__(self):
         return f"last({self.argument})"
@@ -307,16 +299,22 @@ class Comparison(Restriction):
                                     | self.right.variables)
         all_terms: Set[Term] = (self.left.all_terms
                                 | self.right.all_terms)
-        object.__setattr__(self, 'variables', variables)
-        object.__setattr__(self, 'all_terms', all_terms)
+        object.__setattr__(self, '_variables', variables)
+        object.__setattr__(self, '_all_terms', all_terms)
 
-    def substitute(self,
-                   substitution: Dict["Term", "Variable"]) -> "Comparison":
-        return type(self)(self.system, self.left.substitute(substitution),
-                          self.right.substitute(substitution))
+    def normalize(self,
+                  substitution: Dict["Variable",
+                                     "Variable"]
+                  ) -> "Comparison":
+        return type(self)(self.system, self.left.normalize(substitution),
+                          self.right.normalize(substitution))
+
+    @property
+    def comp_str(self) -> str:
+        return self._comp_str  # type: ignore attr-defined
 
     def __str__(self) -> str:
-        return f"{self.left} {self.comp_str} {self.right}"  # type: ignore attr-defined # noqa: E501, F723
+        return f"{self.left} {self.comp_str} {self.right}"
 
     def __hash__(self):
         return hash(self.left) & hash(self.right)
@@ -342,7 +340,7 @@ class IsNext(Comparison):
 class Less(Comparison):
     def __post_init__(self):
         super().__post_init__()
-        object.__setattr__(self, 'comp_str', "<")
+        object.__setattr__(self, '_comp_str', "<")
 
     def as_mona(self):
         left = self.left.as_mona()
@@ -354,7 +352,7 @@ class Less(Comparison):
 class LessEqual(Comparison):
     def __post_init__(self):
         super().__post_init__()
-        object.__setattr__(self, 'comp_str', "<=")
+        object.__setattr__(self, '_comp_str', "<=")
 
     def as_mona(self):
         left = self.left.as_mona()
@@ -366,7 +364,7 @@ class LessEqual(Comparison):
 class Equal(Comparison):
     def __post_init__(self):
         super().__post_init__()
-        object.__setattr__(self, 'comp_str', "=")
+        object.__setattr__(self, '_comp_str', "=")
 
     def __eq__(self, other) -> bool:
         return (type(self) is type(other)
@@ -388,7 +386,7 @@ class Equal(Comparison):
 class Unequal(Comparison):
     def __post_init__(self):
         super().__post_init__()
-        object.__setattr__(self, 'comp_str', "~=")
+        object.__setattr__(self, '_comp_str', "~=")
 
     def __eq__(self, other) -> bool:
         return (type(self) is type(other)
@@ -406,9 +404,22 @@ class Unequal(Comparison):
         return mona.Unequal(left, right)
 
 
+T = TypeVar("T",
+            Equal,
+            Unequal,
+            Less,
+            LessEqual,
+            Last,
+            IsNext,
+            "AtomicCollection",
+            Restriction,
+            AtomicRestriction,
+            Comparison)
+
+
 @dataclass(frozen=True)
-class RestrictionCollection(Restriction):
-    restrictions: FrozenSet[Restriction]
+class RestrictionCollection(Restriction, Generic[T]):
+    restrictions: FrozenSet[T]
 
     def __post_init__(self):
         super().__post_init__()
@@ -417,34 +428,41 @@ class RestrictionCollection(Restriction):
         for r in self.restrictions:
             variables |= r.variables
             all_terms |= r.all_terms
-        object.__setattr__(self, 'all_terms', all_terms)
-        object.__setattr__(self, 'variables', variables)
+        object.__setattr__(self, '_all_terms', all_terms)
+        object.__setattr__(self, '_variables', variables)
 
-    def substitute(self,
-                   substitution: Dict["Term",
-                                      "Variable"]) -> "RestrictionCollection":
+    def normalize(self,
+                  substitution: Dict["Variable",
+                                     "Variable"]
+                  ) -> "RestrictionCollection":
         return RestrictionCollection(self.system,
-                                     frozenset({r.substitute(substitution)
+                                     frozenset({r.normalize(substitution)
                                                 for r in self.restrictions}))
 
     def __str__(self) -> str:
-        restrictions = ", ".join([str(r) for r in self.restrictions])
+        if self.restrictions:
+            restrictions = ", ".join([str(r) for r in self.restrictions])
+        else:
+            restrictions = "<empty>"
         return f"( {restrictions} )"
+
+
+AtomicCollection = RestrictionCollection[AtomicRestriction]
 
 
 @dataclass(frozen=True)
 class Broadcast(Formula):
     variable: Variable
-    guard: RestrictionCollection  # DNF
-    body: PredicateDisjunction
-    quantified_variables: Set[Variable] = field(default_factory=set)
+    guard: RestrictionCollection[AtomicCollection]  # DNF
+    body: PredicateCollection
+    quantified_variables: FrozenSet[Variable] = field(
+            default_factory=frozenset)
 
     def vertical_invariant(self) -> mona.Formula:
-        substitution = {cast(Term, v): Variable(self.system,
-                                                f"substitute_{v.name}")
+        substitution = {v: Variable(self.system, f"substitute_{v.name}")
                         for v in self.quantified_variables}
         try:
-            renamed_broadcast = self.substitute(substitution)
+            renamed_broadcast = self.normalize(substitution)
         except FormulaError:
             raise FormulaError("Cannot generate formula for non-normalized"
                                + " Broadcast {self}")
@@ -479,11 +497,10 @@ class Broadcast(Formula):
         return outer
 
     def one_in_pre(self) -> mona.Formula:
-        substitution = {cast(Term, v): Variable(self.system,
-                                                f"substitute_{v.name}")
+        substitution = {v: Variable(self.system, f"substitute_{v.name}")
                         for v in self.quantified_variables}
         try:
-            renamed_broadcast = self.substitute(substitution)
+            renamed_broadcast = self.normalize(substitution)
         except FormulaError:
             raise FormulaError("Cannot generate formula for non-normalized"
                                + " Broadcast {self}")
@@ -513,11 +530,10 @@ class Broadcast(Formula):
         return outer
 
     def one_in_post(self) -> mona.Formula:
-        substitution = {cast(Term, v): Variable(self.system,
-                                                f"substitute_{v.name}")
+        substitution = {v: Variable(self.system, f"substitute_{v.name}")
                         for v in self.quantified_variables}
         try:
-            renamed_broadcast = self.substitute(substitution)
+            renamed_broadcast = self.normalize(substitution)
         except FormulaError:
             raise FormulaError("Cannot generate formula for non-normalized"
                                + " Broadcast {self}")
@@ -600,58 +616,48 @@ class Broadcast(Formula):
                      for f in cast(RestrictionCollection, c).restrictions])
                 for c in self.guard.restrictions])
 
-    def _substitute_elements(self, substitution: Dict["Term", "Variable"]
-                             ) -> Tuple[Variable,
-                                        RestrictionCollection,
-                                        PredicateDisjunction,
-                                        Set[Variable]]:
-        variable = self.variable.substitute(substitution)
-        quantified_variables = {variable.substitute(substitution)
-                                for variable in self.quantified_variables}
-        guard = self.guard.substitute(substitution)
-        body = self.body.substitute(substitution)
-        return (variable, guard, body, quantified_variables)
+    def add_conjunct(self,
+                     base: RestrictionCollection[AtomicCollection],
+                     conjunct: FrozenSet[AtomicRestriction]
+                     ) -> RestrictionCollection[AtomicCollection]:
+        new_collections: Set[AtomicCollection] = set()
+        for c in base.restrictions:
+            current_restrictions = conjunct | c.restrictions
+            new_collection: AtomicCollection = RestrictionCollection(
+                    self.system, current_restrictions)
+            new_collections.add(new_collection)
+        return RestrictionCollection(self.system, frozenset(new_collections))
 
-    def substitute(self,
-                   substitution: Dict["Term", "Variable"]) -> "Broadcast":
-        var, guard, body, q_vars = self._substitute_elements(substitution)
-        return Broadcast(self.system, var, guard, body, q_vars)
-
-    def normalize(self, substitutions: Dict["Term", "Variable"]
+    def normalize(self, substitutions: Dict["Variable", "Variable"]
                   ) -> "Broadcast":
         logger.debug(f"normalizing broadcast {self}")
-        local_terms = {t for t in self.all_terms  # type: ignore attr-defined # noqa: E501, F723
-                       if (t.variables  # thus, no term on constant basis
-                           and t.variables.issubset({self.variable}))}
-        logger.debug(f"identifying local terms {local_terms}")
-        logger.debug(f"going over local terms with {substitutions}")
-        term_substitions = dict(substitutions)
-        all_restrictions: Set[Restriction] = set()
-        for term in local_terms:
-            restrictions, variable = term.term_normalization(term_substitions)
-            all_restrictions |= restrictions
-            term_substitions[term] = variable
-        logger.debug(f"gathered new restrictions {all_restrictions}"
-                     + " and " + f" substitutions: {term_substitions}")
-        var, guard, body, q_vars = self._substitute_elements(term_substitions)
-        new_guard_clauses = set()
-        for coll in guard.restrictions:
-            coll = cast(RestrictionCollection, coll)
-            new_guard_clauses.add(
-                    cast(Restriction,
-                         RestrictionCollection(self.system,
-                                               (coll.restrictions
-                                                | all_restrictions))))
-        new_guard = RestrictionCollection(self.system,
-                                          frozenset(new_guard_clauses))
-        n_broadcast = Broadcast(self.system, var, new_guard, body, q_vars)
-        logger.debug(f"Normalized\n\t{self}\nto\n\t{n_broadcast}")
+        logger.debug("going over local terms "
+                     + f"{self.local_terms} with {substitutions}")
+        quantified_variables = {t.normalize(substitutions)
+                                for t in self.local_terms}
+        added_restrictions: Set[AtomicRestriction] = set()
+        for t in self.local_terms:
+            added_restrictions |= t.normalizing_restrictions(substitutions)
+        logger.debug(f"gathered new restrictions {added_restrictions}")
+        debug_string = "normalized {} to {} under {}"
+        var = self.variable.normalize(substitutions)
+        logger.debug(debug_string.format(self.variable, var, substitutions))
+        r_guard = self.guard.normalize(substitutions)
+        logger.debug(f"renamed {self.guard} to {r_guard}")
+        guard = self.add_conjunct(r_guard, frozenset(added_restrictions))
+        logger.debug(debug_string.format(self.guard, guard, substitutions))
+        body = self.body.normalize(substitutions)
+        logger.debug(debug_string.format(self.body, body, substitutions))
+        n_broadcast = Broadcast(self.system, var, guard, body,
+                                frozenset(quantified_variables))
+        logger.debug(f"Normalized broadcast\n\t{self}\nto\n\t{n_broadcast}")
         return n_broadcast
 
     def __post_init__(self):
         super().__post_init__()
         object.__setattr__(self, 'quantified_variables',
-                           self.quantified_variables | {self.variable})
+                           frozenset(self.quantified_variables
+                                     | {self.variable}))
         free_variables: Set[Variable] = (self.guard.variables
                                          - self.quantified_variables)
         variables: Set[Variable] = (self.guard.variables
@@ -659,25 +665,39 @@ class Broadcast(Formula):
         all_terms: Set[Term] = (self.quantified_variables
                                 | self.guard.all_terms
                                 | self.body.all_terms)
+        local_terms: Set[Term] = {t for t in all_terms
+                                  if (t.variables
+                                      and t.variables.issubset(
+                                          self.quantified_variables))}
         if any([not predicate.variables.issubset(self.quantified_variables)
                 for predicate in self.body.predicates]):
             raise FormulaError(f"Broadcast variable mismatch")
-        object.__setattr__(self, 'all_terms', all_terms)
-        object.__setattr__(self, 'variables', variables)
-        object.__setattr__(self, 'free_variables', free_variables)
+        object.__setattr__(self, '_all_terms', all_terms)
+        object.__setattr__(self, '_variables', variables)
+        object.__setattr__(self, '_free_variables', free_variables)
+        object.__setattr__(self, '_local_terms', local_terms)
+
+    @property
+    def local_terms(self) -> Set[Term]:
+        return self._local_terms  # type: ignore attr-defined
+
+    @property
+    def free_variables(self) -> Set[Variable]:
+        return self._free_variables  # type: ignore attr-defined
 
     def __str__(self):
         return "broadcasting {{ {variables}: {guard}. {body} }}".format(
                 variables=", ".join([str(v)
                                      for v in self.quantified_variables]),
                 guard=self.guard,
-                body=self.body)
+                body=" | ".join([str(p) for p in sorted(
+                    self.body.predicates, key=str)]))
 
 
 @dataclass(frozen=True)
 class Clause(Formula):
     guard: RestrictionCollection  # Conjunction of Atoms
-    ports: PredicateConjunction
+    ports: PredicateCollection
     broadcasts: List[Broadcast]
 
     def invariant_predicate(self, number: int) -> mona.Formula:
@@ -692,7 +712,7 @@ class Clause(Formula):
                               mona.Negation(self.one_in_pre())]),
             ])
         variables = sorted([cast(mona.Variable, v.as_mona())
-                            for v in self.free_variables], key=str)  # type: ignore attr-defined  # noqa: E501
+                            for v in self.free_variables], key=str)
         guard = self.guard_as_mona()
         quantification = mona.UniversalFirstOrder(
                 variables,
@@ -776,7 +796,7 @@ class Clause(Formula):
     def trap_predicate(self, number: int) -> mona.Formula:
         guard = self.guard_as_mona()
         variables = sorted([cast(mona.Variable, v.as_mona())
-                            for v in self.free_variables], key=str)  # type: ignore attr-defined  # noqa: E501
+                            for v in self.free_variables], key=str)
         ports = self.ports.predicates
         free_pre = mona.Disjunction([p.hit_pre() for p in ports])
         free_post = mona.Disjunction([p.hit_post() for p in ports])
@@ -813,7 +833,7 @@ class Clause(Formula):
                 guard,
                 mona.Disjunction([dead_free, dead_broadcasts]))
         formula = mona.UniversalFirstOrder([cast(mona.Variable, v.as_mona())
-                                            for v in self.free_variables],  # type: ignore attr-defined  # noqa: E501
+                                            for v in self.free_variables],
                                            inner)
         return mona.PredicateDefinition(f"dead_transition_{number}",
                                         self.system.state_variables,
@@ -828,21 +848,32 @@ class Clause(Formula):
                                     | self.guard.variables)
         free_variables: Set[Variable] = (self.ports.variables
                                          | self.guard.variables)
-        predicates: Set[Predicate] = self.ports.predicates
         all_terms: Set[Term] = self.guard.all_terms | self.ports.all_terms
         for b in self.broadcasts:
             variables |= b.variables
             free_variables |= b.free_variables
-            predicates |= b.body.predicates
             all_terms |= b.all_terms
-        local_terms: Set[Term] = {t for t in self.all_terms
-                                  if t.variables.issubset(
-                                      self.free_variables)}
-        object.__setattr__(self, 'all_terms', all_terms)
-        object.__setattr__(self, 'variables', variables)
-        object.__setattr__(self, 'predicates', predicates)
-        object.__setattr__(self, 'free_variables', free_variables)
-        object.__setattr__(self, 'local_terms', local_terms)
+        local_terms: Set[Term] = {t for t in all_terms
+                                  if (t.variables and t.variables.issubset(
+                                      free_variables))}
+        constant_terms: Set[Term] = {t for t in all_terms if not t.variables}
+        object.__setattr__(self, '_all_terms', all_terms)
+        object.__setattr__(self, '_variables', variables)
+        object.__setattr__(self, '_free_variables', free_variables)
+        object.__setattr__(self, '_local_terms', local_terms)
+        object.__setattr__(self, '_constant_terms', constant_terms)
+
+    @property
+    def local_terms(self) -> Set[Variable]:
+        return self._local_terms  # type: ignore attr-defined
+
+    @property
+    def constant_terms(self) -> Set[Variable]:
+        return self._constant_terms  # type: ignore attr-defined
+
+    @property
+    def free_variables(self) -> Set[Variable]:
+        return self._free_variables  # type: ignore attr-defined
 
     def __str__(self) -> str:
         if res := self.guard.restrictions:  # noqa: E203, E701, E231
@@ -858,67 +889,58 @@ class Clause(Formula):
 
     def normalize_terms(self) -> "Clause":
         logger.debug(f"normalizing terms in clause {self}")
-        local_terms = {t for t in self.all_terms  # type: ignore attr-defined # noqa: E501, F723
-                       if (t.variables
-                           and t.variables.issubset(self.free_variables))}  # type: ignore attr-defined # noqa: E501, F723
-        constant_terms = {t for t in self.all_terms  # type: ignore attr-defined # noqa: E501, F723
-                          if not t.variables}
-        logger.debug(f"identifying local terms {local_terms}")
-        logger.debug(f"identifying const terms {constant_terms}")
-        sorted_vars = sorted([v for v in self.free_variables])  # type: ignore attr-defined # noqa: E501, F723
-        renaming: Dict[Term, Variable] = {v: Variable(self.system, f"x_{i}")
-                                          for i, v in enumerate(sorted_vars)}
-        logger.debug(f"going over local terms with {renaming}")
-        term_substitions = {}
-        term_restrictions: Set[Restriction] = set()
-        for term in local_terms:
-            restrictions, variable = term.term_normalization(renaming)
-            term_restrictions |= restrictions
-            term_substitions[term] = variable
-        logger.debug(f"gathered term restrictions {term_restrictions}"
-                     + " and " + f" term substitutions: {term_substitions}")
-        renaming.update(term_substitions)
-        const_substitions = {}
-        const_restrictions: Set[Restriction] = set()
-        for term in constant_terms:
-            restrictions, variable = term.term_normalization(renaming)
-            const_restrictions |= restrictions
-            const_substitions[term] = variable
-        logger.debug(f"gathered constant restrictions {const_restrictions}"
-                     + f" and constant substitutions: {const_substitions}")
-        all_renames = dict(renaming)
-        all_renames.update(const_substitions)
-        broadcasts = []
+        sorted_vars = sorted([v for v in self.free_variables])
+        renaming: Dict[Variable, Variable] = {v: Variable(self.system,
+                                                          f"x_{i}")
+                                              for i, v in enumerate(
+                                                  sorted_vars)}
+        logger.debug(f"determined renaming of free variables: {renaming}")
+        term_restrictions: Set[AtomicRestriction] = set()
+        for t in self.local_terms:
+            term_restrictions |= t.normalizing_restrictions(renaming)
+        logger.debug("gathered normalizing restrictions "
+                     + f"{term_restrictions} for free terms under {renaming}")
+        const_restrictions: Set[AtomicRestriction] = set()
+        for c in self.constant_terms:
+            const_restrictions |= c.normalizing_restrictions(renaming)
+        renamed_guard = self.guard.normalize(renaming)
+        logger.debug(f"renamed {self.guard} to {renamed_guard}")
+        updated_guard = RestrictionCollection(
+                self.system,
+                renamed_guard.restrictions | frozenset(const_restrictions
+                                                       | term_restrictions))
+        logger.debug(f"updated {renamed_guard} to {updated_guard}")
+        new_ports = self.ports.normalize(renaming)
+        logger.debug(f"updated {self.ports} to {new_ports}")
+        logger.debug("normalizing broadcasts...")
+        broadcasts: List[Broadcast] = []
         for j, broadcast in enumerate(self.broadcasts):
             replacement_variable = Variable(self.system, f"b_{j}")
-            all_renames[broadcast.variable] = replacement_variable
-            n_broadcast = broadcast.normalize(all_renames)
+            renaming[broadcast.variable] = replacement_variable
+            logger.debug(f"rename {broadcast} by {renaming}")
+            n_broadcast = broadcast.normalize(renaming)
+            logger.debug(f"resulted in {n_broadcast}")
             broadcasts.append(n_broadcast)
-        new_guard = RestrictionCollection(
-                self.system,
-                (self.guard.restrictions
-                 | term_restrictions
-                 | const_restrictions)).substitute(
-                        renaming)
-        new_ports = self.ports.substitute(all_renames)
-        n_clause = Clause(self.system, new_guard, new_ports, broadcasts)
+        n_clause = Clause(self.system, updated_guard, new_ports, broadcasts)
         logger.info(f"Normalized terms in\n\t{self}\nto\n\t{n_clause}")
         return n_clause
 
     def check_type_consistency(self) -> "Clause":
-        free_types = {p.argument: self.system.components_of_labels[p.name]  # type: ignore attr-defined # noqa: E501, F723
+        free_types = {p.argument: self.system.components_of_labels[p.name]
                       for p in self.ports.predicates}
-        broadcast_types = {j: {self.system.components_of_labels[p.name]  # type: ignore attr-defined # noqa: E501, F723
-                               for p in b.body.predicates}
-                           for j, b in enumerate(self.broadcasts)}
+        broadcast_types: Dict[int, Set[Component]] = {
+                j: {self.system.components_of_labels[p.name]
+                    for p in b.body.predicates}
+                for j, b in enumerate(self.broadcasts)}
+        broadcast_type: Dict[int, Component] = {}
         for j in broadcast_types:
             if len(labels := broadcast_types[j]) != 1:  # noqa: E203, E231
                 b = self.broadcasts[j]
                 raise FormulaError(f"Inconsistent types in {b}")
             else:
-                broadcast_types[j] = labels.pop()
+                broadcast_type[j] = labels.pop()
         new_broadcasts: List[Broadcast] = []
-        for j, bc in broadcast_types.items():
+        for j, bc in broadcast_type.items():
             broadcast = self.broadcasts[j]
             gathered_restrictions: Set[Restriction] = set()
             for v, fc in free_types.items():
@@ -957,7 +979,7 @@ class Clause(Formula):
         logger.info(f"Normalized\n\t{self}\nto\n\t{n_clause}")
         return n_clause
 
-    def normalize(self) -> "Clause":
+    def construct_normalized_clause(self) -> "Clause":
         n_clause = self.normalize_terms()
         n_clause = n_clause.check_type_consistency()
         return n_clause
@@ -1070,7 +1092,8 @@ class Interaction:
         return sorted(list(self.properties.keys()) + ["deadlock"])
 
     def normalize(self) -> "Interaction":
-        return Interaction([c.normalize() for c in self.clauses],
+        return Interaction([c.construct_normalized_clause()
+                            for c in self.clauses],
                            self.system,
                            self.assumptions,
                            self.properties)

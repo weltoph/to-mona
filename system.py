@@ -1,4 +1,4 @@
-from typing import Set, Optional, Tuple, cast, FrozenSet, List
+from typing import Set, Optional, Tuple, cast, FrozenSet, List, Dict
 from dataclasses import dataclass
 from enum import Enum, unique
 
@@ -39,8 +39,16 @@ class Component:
             else:
                 collection_by_label[l] = transitions.pop()
         # TODO: maybe check for connectivity
-        object.__setattr__(self, 'transition_by_label', collection_by_label)
-        object.__setattr__(self, 'states', sorted(list(states)))
+        object.__setattr__(self, '_transition_by_label', collection_by_label)
+        object.__setattr__(self, '_states', sorted(list(states)))
+
+    @property
+    def states(self) -> List[str]:
+        return self._states  # type: ignore attr-defined  # noqa: F723
+
+    @property
+    def transition_by_label(self) -> Dict[str, Tuple[str, str]]:
+        return self._transition_by_label  # type: ignore attr-defined  # noqa: F723, E501
 
     @property
     def state_variables(self) -> List[mona.Variable]:
@@ -94,7 +102,7 @@ class System:
                 for c in self.components
                 for l in c.labels
             }
-        object.__setattr__(self, 'components_of_labels',
+        object.__setattr__(self, '_components_of_labels',
                            components_of_labels)
         all_labels = set(self.components_of_labels.keys())
         sum_of_labels = sum([c.number_of_labels for c in self.components])
@@ -102,8 +110,12 @@ class System:
             raise SystemDefinitionError(f"Not disjoint labels in components!")
 
     @property
+    def components_of_labels(self) -> Dict[str, Component]:
+        return self._components_of_labels  # type: ignore attr-defined  # noqa: F723, E501
+
+    @property
     def states(self) -> Set[str]:
-        return set(sum([c.states for c in self.components],  # type: ignore
+        return set(sum([c.states for c in self.components],
                        []))
 
     @property
@@ -112,7 +124,7 @@ class System:
 
     def edge_with_label(self, label: str) -> Optional[Tuple[str, str]]:
         try:
-            component = self.components_of_labels[label]  # type: ignore
+            component = self.components_of_labels[label]
             return component.edge_with_label(label)
         except KeyError:
             return None

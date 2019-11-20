@@ -58,14 +58,14 @@ class FormulaParser(lark.Transformer):
         return Predicate(self.system, str(name), argument, *edge)
 
     def predicate_conjunction(self, predicates):
-        from formula import PredicateConjunction
+        from formula import PredicateCollection
         logger.debug(f"Parsing conjunction of predicates {predicates}")
-        return PredicateConjunction(self.system, frozenset(predicates))
+        return PredicateCollection(self.system, frozenset(predicates))
 
     def predicate_disjunction(self, predicates):
-        from formula import PredicateDisjunction
+        from formula import PredicateCollection
         logger.debug(f"Parsing disjunction of predicates {predicates}")
-        return PredicateDisjunction(self.system, frozenset(predicates))
+        return PredicateCollection(self.system, frozenset(predicates))
 
     @lark.v_args(inline=True)
     def comparison(self, left, symbol, right):
@@ -159,13 +159,13 @@ class FormulaParser(lark.Transformer):
 
     def broadcasting_clause(self, broadcasts):
         from formula import Clause, RestrictionCollection
-        from formula import PredicateConjunction
+        from formula import PredicateCollection
         logger.debug(f"Parsing broadcasting clause {broadcasts}")
         self.clauses.append(Clause(self.system,
                                    RestrictionCollection(self.system,
                                                          frozenset()),
-                                   PredicateConjunction(self.system,
-                                                        frozenset()),
+                                   PredicateCollection(self.system,
+                                                       frozenset()),
                                    broadcasts))
         raise lark.Discard()
 
