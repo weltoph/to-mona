@@ -14,12 +14,6 @@ Component State <init> {
 Component Decision <undecided> {
   undecided -> agree          -> agreed
   undecided -> disagree       -> disagreed
-
-  agreed    -> agrees         -> agreed
-  disagreed -> disagrees      -> disagreed
-
-  agreed    -> swapToDisagree -> disagreed
-  disagreed -> swapToAgree    -> agreed
 }
 
 Formula {
@@ -27,8 +21,7 @@ Formula {
   ph(i) broadcasting { p: p ~= i. fh(p) | ft(p) };
   # one of the cryptographers pay and flip coin heads
   pt(i) broadcasting { p: p ~= i. fh(p) | ft(p) };
-
-  # none of the cryptographers pays
+  # none of the cryptographers pay
   broadcasting { p: fh(p) | ft(p) };
 
   # freeloading agreeing cryptographer i
@@ -38,8 +31,8 @@ Formula {
   agree(i) & isFT(i) & isPT(succ(i));
 
   # paying agreeing cryptographer i
-  agree(i) & isPH(i) & isFH(succ(i));
-  agree(i) & isPH(i) & isFH(succ(i));
+  agree(i) & isPH(i) & isFT(succ(i));
+  agree(i) & isPT(i) & isFH(succ(i));
 
   # freeloading disagreeing cryptographer i
   disagree(i) & isFH(i) & isFT(succ(i));
@@ -50,36 +43,11 @@ Formula {
   # paying disagreeing cryptographer i
   disagree(i) & isPH(i) & isFH(succ(i));
   disagree(i) & isPT(i) & isFT(succ(i));
-
-  # cancel out two agrees until at most one agree is left (if there are odd
-  # agrees) or none (if there are even agrees)
-  i ~= j. swapToAgree(i) & swapToAgree(j);
-}
-
-assumption "Even" {
-  "var2 Even; 0 in Even; all1 x: (0 <= x & x < n + 2) => ((x in Even) <=> ((x+1) notin Even))"
-}
-
-assumption "end" {
-  "pred end(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 x: (0 <= x & x < n & ( x in agreed | x in disagreed ) & (all1 y: ((0 <= y & y < n & y ~= x) => y in agreed))))"
-}
-
-assumption "payingMaster" {
-  "pred payingMaster(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = ((all1 x : (0 <= x & x < n) => ((x in FH | x in FT))))"
-}
-
-assumption "payingCryptographer" {
-  "pred payingCryptographer(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 y : (0 <= y & y < n & (y in PH | y in PT)))"
-}
-
-assumption "oddDisagreed" {
-  "pred oddDisagreed(var2 FH, var2 FT, var2 PH, var2 PT, var2 init, var2 agreed, var2 disagreed, var2 undecided) = (ex1 x: (0 <= x & x < n & x in disagreed))"
-}
-
-property "MasterPaid" {
-  "end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingMaster(FH, FT, PH, PT, init, agreed, disagreed, undecided) & oddDisagreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
 }
 
 property "CryptographerPaid" {
-  "end(FH, FT, PH, PT, init, agreed, disagreed, undecided) & payingCryptographer(FH, FT, PH, PT, init, agreed, disagreed, undecided) & ~oddDisagreed(FH, FT, PH, PT, init, agreed, disagreed, undecided)"
+  "(/* one cryptographer paid: */ ex1 x: (0 <= x & x < n & (x in PH | x in PT)) & /* everyone has reached a decision: */ all1 y: ( ( 0 <= y & y < n ) => ( y in agreed | y in disagreed ))) & /* 'automaton' to test if there are even disagrees: */ ex2 EvenDisagrees: (n in EvenDisagrees & 0 in EvenDisagrees & (all1 x: (0 <= x & x < n) => ( (((x in EvenDisagrees & x in disagreed) | (x notin EvenDisagrees & x notin disagreed)) <=> ((x+1) notin EvenDisagrees)))))"
+}
+property "MasterPaid" {
+  "/* everyone has reached a decision and no one paid: */( all1 y: ( ( 0 <= y & y < n ) => ( ( y in agreed | y in disagreed ) & (y notin PH & y notin PT)))) & /* 'automaton' to test if there are even disagrees: */ ex2 EvenDisagrees: (n notin EvenDisagrees & 0 in EvenDisagrees & (all1 x: (0 <= x & x < n) => ( (((x in EvenDisagrees & x in disagreed) | (x notin EvenDisagrees & x notin disagreed)) <=> ((x+1) notin EvenDisagrees)))))"
 }

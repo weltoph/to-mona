@@ -1,0 +1,24 @@
+Component Ticket <available> {
+  available -> A2C -> critical
+  available -> A2W -> waiting
+  available -> isAvailable -> available
+
+  critical -> C2A -> available
+  critical -> isCritical -> critical
+
+  waiting -> W2C -> critical
+  waiting -> isWaiting -> waiting
+}
+
+Formula {
+  A2C(0) broadcasting { o: o ~= 0. isAvailable(o) };
+  c < a. isCritical(c) & A2W(a) broadcasting { o: o < c | a < o. isAvailable(o) }
+                                broadcasting { o: c < o & o < a. isWaiting(o) };
+
+  C2A(c) broadcasting { o: o < c. isAvailable(o) };
+  W2C(w) broadcasting { o: o < w. isAvailable(o) };
+}
+
+property "nomutex" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in critical & j in critical"
+}

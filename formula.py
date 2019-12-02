@@ -311,7 +311,7 @@ class Comparison(Restriction):
 
     @property
     def comp_str(self) -> str:
-        return self._comp_str  # type: ignore attr-defined
+        return self._comp_str  # type: ignore
 
     def __str__(self) -> str:
         return f"{self.left} {self.comp_str} {self.right}"
@@ -679,11 +679,11 @@ class Broadcast(Formula):
 
     @property
     def local_terms(self) -> Set[Term]:
-        return self._local_terms  # type: ignore attr-defined
+        return self._local_terms  # type: ignore
 
     @property
     def free_variables(self) -> Set[Variable]:
-        return self._free_variables  # type: ignore attr-defined
+        return self._free_variables  # type: ignore
 
     def __str__(self):
         return "broadcasting {{ {variables}: {guard}. {body} }}".format(
@@ -865,15 +865,15 @@ class Clause(Formula):
 
     @property
     def local_terms(self) -> Set[Variable]:
-        return self._local_terms  # type: ignore attr-defined
+        return self._local_terms  # type: ignore
 
     @property
     def constant_terms(self) -> Set[Variable]:
-        return self._constant_terms  # type: ignore attr-defined
+        return self._constant_terms  # type: ignore
 
     @property
     def free_variables(self) -> Set[Variable]:
-        return self._free_variables  # type: ignore attr-defined
+        return self._free_variables  # type: ignore
 
     def __str__(self) -> str:
         if res := self.guard.restrictions:  # noqa: E203, E701, E231

@@ -53,7 +53,7 @@ class FormulaParser(lark.Transformer):
         from formula import Predicate
         edge = self.system.edge_with_label(str(name))
         if not edge:
-            raise ParserError("Cannot bind Predicate {str(name)}")
+            raise ParserError(f"Cannot bind Predicate {str(name)}")
         logger.debug(f"Parsing predicate bound to {edge} named {str(name)}")
         return Predicate(self.system, str(name), argument, *edge)
 

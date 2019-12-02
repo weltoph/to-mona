@@ -1,0 +1,49 @@
+Component Pointer <notHere> {
+  notHere -> grab   -> Here
+  Here    -> drop   -> notHere
+  Here    -> isHere -> Here
+  notHere -> isNotHere -> notHere
+}
+
+Component Flag <FlagFalse> {
+  FlagFalse -> set -> FlagTrue
+  FlagTrue -> unset -> FlagFalse
+  FlagTrue -> isTrue -> FlagTrue
+  FlagFalse -> isFalse -> FlagFalse
+}
+
+Component Program <init> {
+  init -> initialize -> PC1
+  PC1 -> setFlag -> PC2
+  PC2 -> holdingPointer -> PC5
+  PC2 -> notHoldingPointer -> PC3
+  PC3 -> failingPointerCheck -> PC3
+  PC3 -> winningPointerCheck -> PC4
+  PC4 -> grabPointer -> PC5
+  PC5 -> failingOthersCheck -> PC1
+  PC5 -> winningOthersCheck -> PC6
+  PC6 -> unsetFlag -> PC7
+  PC7 -> startOver -> PC1
+}
+
+Formula {
+  # put pointer to a well-defined position (on 0-th agent)
+  grab(0) & initialize(0) broadcasting {o: o ~= 0. initialize(o) };
+  setFlag(i) & set(i);
+  setFlag(i) & isTrue(i);
+  holdingPointer(i) & isHere(i);
+  notHoldingPointer(i) & isNotHere(i);
+  i ~= j. failingPointerCheck(i) & isHere(j) & isTrue(j);
+  i ~= j. winningPointerCheck(i) & isHere(j) & isFalse(j);
+  grabPointer(i) & isHere(i);
+  i ~= j. grabPointer(i) & drop(j) & grab(i);
+  i ~= j. failingOthersCheck(i) & isTrue(j);
+  winningOthersCheck(i) broadcasting {o: o ~= i. isFalse(o) };
+  unsetFlag(i) & unset(i);
+  unsetFlag(i) & isFalse(i);
+  startOver(i);
+}
+
+property "nomutex" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in PC6 & j in PC6"
+}

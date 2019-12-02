@@ -44,15 +44,15 @@ class Component:
 
     @property
     def states(self) -> List[str]:
-        return self._states  # type: ignore attr-defined  # noqa: F723
+        return self._states  # type: ignore # noqa: F723
 
     @property
     def transition_by_label(self) -> Dict[str, Tuple[str, str]]:
-        return self._transition_by_label  # type: ignore attr-defined  # noqa: F723, E501
+        return self._transition_by_label  # type: ignore # noqa: F723, E501
 
     @property
     def state_variables(self) -> List[mona.Variable]:
-        return sorted([mona.Variable(s) for s in self.states], key=str)  # type: ignore attr-defined  # noqa: E501, F723
+        return sorted([mona.Variable(s) for s in self.states], key=str)  # type: ignore # noqa: E501, F723
 
     @property
     def number_of_states(self) -> int:
@@ -111,7 +111,7 @@ class System:
 
     @property
     def components_of_labels(self) -> Dict[str, Component]:
-        return self._components_of_labels  # type: ignore attr-defined  # noqa: F723, E501
+        return self._components_of_labels  # type: ignore # noqa: F723, E501
 
     @property
     def states(self) -> Set[str]:
