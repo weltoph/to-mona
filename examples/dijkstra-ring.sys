@@ -1,0 +1,58 @@
+###############################################################################
+# Taken from "Reachability Sets of Parametrized Rings As Regular Languages"   #
+# by Laurent Fribourg and Hans Olsen.                                         #
+###############################################################################
+
+Component State <stateInit> {
+  stateInit -> initializeState -> idle
+  idle      -> I2W             -> waiting
+  idle      -> I2C             -> critical
+  waiting   -> W2C             -> critical
+  critical  -> C2I             -> idle
+
+  idle      -> isIdle          -> idle
+  waiting   -> isWaiting       -> waiting
+}
+
+Component Token <tokenInit> {
+  tokenInit -> initializeTokenPos -> token
+  tokenInit -> initializeTokenNeg -> noToken
+  token     -> giveToken          -> noToken
+  noToken   -> receiveToken       -> token
+  token     -> hasToken           -> token
+  noToken   -> hasNoToken         -> noToken
+}
+
+Component Color <colorInit> {
+  colorInit -> initializeColor -> white
+  white     -> isWhite         -> white
+  white     -> toBlack         -> black
+  black     -> isBlack         -> black
+  black     -> toWhite         -> white
+}
+
+Formula {
+  initializeTokenPos(0) & initializeState(0) & initializeColor(0) broadcasting { o: o ~= 0. initializeTokenNeg(o) };
+                                                                  broadcasting { o: o ~= 0. initializeState(o) };
+                                                                  broadcasting { o: o ~= 0. initializeColor(o) };
+  # r1
+  I2W(i) & hasNoToken(i) & isBlack(i);
+  # r2
+  W2C(i) & hasToken(i);
+  # r3
+  C2I(i);
+  # r4 + r'4
+  toBlack(i) & I2W(succ(i)) & hasNoToken(succ(i)) & isWhite(succ(i));
+  # r5 + r'5
+  toWhite(i) & giveToken(i) & isIdle(i) & receiveToken(succ(i));
+  # r6 + r'6
+  toBlack(i) & hasNoToken(succ(i)) & isBlack(succ(i));
+  # r7
+  I2C(i) & hasToken(i);
+  # r8 + r'8
+  isBlack(i) & I2W(succ(i)) & hasNoToken(succ(i)) & isWhite(succ(i));
+}
+
+property "nomutex" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in critical & j in critical"
+}

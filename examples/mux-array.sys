@@ -1,0 +1,37 @@
+###############################################################################
+# Taken from "Reachability Sets of Parametrized Rings As Regular Languages"   #
+# by Laurent Fribourg and Hans Olsen.                                         #
+###############################################################################
+
+Component State <stateInit> {
+  stateInit -> initializeState -> idle
+  idle      -> I2W             -> waiting
+  waiting   -> W2C             -> critical
+  critical  -> C2I             -> idle
+
+  idle      -> isIdle          -> idle
+  waiting   -> isWaiting       -> waiting
+}
+
+Component Token <tokenInit> {
+  tokenInit -> initializeTokenPos -> token
+  tokenInit -> initializeTokenNeg -> noToken
+  token -> giveToken -> noToken
+  noToken -> receiveToken -> token
+  token -> hasToken -> token
+}
+
+Formula {
+  initializeTokenPos(0) & initializeState(0) broadcasting { o: o ~= 0. initializeTokenNeg(o) };
+                                             broadcasting { o: o ~= 0. initializeState(o) };
+
+  I2W(i);
+  C2I(i);
+  W2C(i) & hasToken(i);
+  i < j & succ(i) = j. isIdle(i) & giveToken(i) & isWaiting(j)
+                                                & receiveToken(j);
+}
+
+property "nomutex" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in critical & j in critical"
+}

@@ -1,0 +1,20 @@
+Component Allocator <holding> {
+  holding -> grantAccess -> granted
+  granted -> claimAccess -> holding
+}
+
+Component Client <idle> {
+  idle -> I2W -> waiting
+  waiting -> W2C -> critical
+  critical -> C2I -> idle
+}
+
+Formula {
+  I2W(i);
+  grantAccess(0) & W2C(i);
+  claimAccess(0) & C2I(i);
+}
+
+property "nomutex" {
+  "ex1 i, j: 0 <= i & i < n & 0 <= j & j < n & i ~= j & i in critical & j in critical"
+}
